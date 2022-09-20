@@ -1,0 +1,29 @@
+Package: jrtools
+Type: Package
+Title: Miscellaneous Statistical and Graphing Utilities
+Version: 0.1.0
+Author: Dr. John I. Robinson, PhD
+Maintainer: John Robinson <john.robinson@wustl.edu>
+Description: Various functions I (re)use frequently for statistical analyses. 
+  Also has a few utilities for dealing with the stupid ways that Thermo formats
+  output from their Compound Discoverer software.
+Imports:
+    caret,
+    dplyr,
+    foreach,
+    ggplot2,
+    glmnet,
+    igraph,
+    magrittr,
+    readr,
+    rlang,
+    stats,
+    tibble,
+    tidyr
+Suggests:
+    pROC,
+    ggthemes
+License: LGPL
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.1
