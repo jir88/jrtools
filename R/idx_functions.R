@@ -36,6 +36,57 @@ tidy_gap_fill_methods <- function(method_data_file) {
   return(fill_data)
 }
 
+#' Tidy Compound Discoverer mzCloud Hits
+#'
+#' Compound Discoverer exports detailed information on mzCloud database matches
+#' into a weird nested Excel format that doesn't work well with R. This method
+#' converts it into a tidy format for use with the other data exported from
+#' Compound Discoverer.
+#' @param mzcloud_data a tibble containing the exported mzCloud data
+#' @return the data in a tidy tibble with data nesting removed
+#' @details Compound Discoverer abuses Excel's row grouping feature to export
+#'   information on mzCloud database hits. This method cleans it up into a
+#'   format R can use.
+#' @importFrom magrittr %>%
+#' @export
+tidy_mzCloud_hits <- function(mzcloud_data) {
+  # watch out for changes to file formatting
+  if(sum(mzcloud_data$Formula == "Tags", na.rm = TRUE) !=
+     sum(!is.na(mzcloud_data$`Reference Ion`))) {
+    warning("Number of 'Tags' entries in Formula column doesn't match number of reference ions! Check exported spreadsheet for formatting changes!")
+  }
+
+  # actual feature rows always list reference ion
+  feature_idx <- which(!is.na(mzcloud_data$`Reference Ion`))
+
+  mzcloud_features <- mzcloud_data %>%
+    dplyr::slice(feature_idx) %>%
+    # generate feature IDs
+    dplyr::mutate(Feature_ID = paste0(`Calc. MW`, "@", `RT [min]`))
+
+  # pull out column names for the mzCloud hit tables
+  hit_cols <- c(as.character(mzcloud_data[2, ]), "Feature_ID")
+  # fix NAs that got converted to strings
+  hit_cols[which(hit_cols == "NA")] <- NA
+  hit_na_cols <- which(is.na(hit_cols))
+
+  df <- mzcloud_data %>%
+    # merge feature IDs into the original data structure
+    dplyr::mutate(Feature_ID = rep(mzcloud_features$Feature_ID,
+                                   times = diff(append(feature_idx, nrow(mzcloud_data) + 1)))) %>%
+    # remove original 'headers'
+    dplyr::slice(-feature_idx, -(feature_idx + 1)) %>%
+    # drop unused columns
+    dplyr::select(-dplyr::all_of(hit_na_cols))
+
+  # rename columns
+  names(df) <- hit_cols[-hit_na_cols]
+
+  df2 <- dplyr::left_join(mzcloud_features, df, by = "Feature_ID",
+                   suffix = c(".feature", ".mzCloud")) %>%
+    readr::type_convert()
+}
+
 #' Export features for import to ID-X method editor
 #'
 #' The method editor software for the ID-X can import properly-formatted TSV
