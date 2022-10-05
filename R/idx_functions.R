@@ -84,7 +84,8 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
 
   df2 <- dplyr::left_join(mzcloud_features, df, by = "Feature_ID",
                    suffix = c(".feature", ".mzCloud")) %>%
-    readr::type_convert()
+    readr::type_convert(col_types = readr::cols())
+  return(df2)
 }
 
 #' Export features for import to ID-X method editor
