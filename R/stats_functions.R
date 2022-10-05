@@ -161,7 +161,7 @@ multinomial_deviance <- function(mdl, x, y) {
 binomial_deviance <- function (mdl, x, y)
 {
   if(class(mdl)[1] != "lognet") {
-    stop(simpleError("Tried to call multinomial_deviance with non-multinomial logit model!"))
+    stop(simpleError("Tried to call binomial_deviance with non-binomial logit model!"))
   }
 
   prob_min = 1e-05
