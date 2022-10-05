@@ -1,12 +1,12 @@
 Package: jrtools
 Type: Package
 Title: Miscellaneous Statistical and Graphing Utilities
-Version: 0.3.0
+Version: 0.3.1
 Author: Dr. John I. Robinson, PhD
 Maintainer: John Robinson <john.robinson@wustl.edu>
 Description: Various functions I (re)use frequently for statistical analyses. 
-  Also has a few utilities for dealing with the stupid ways that Thermo formats
-  output from their Compound Discoverer software.
+  Also has a few utilities for dealing with output from Thermo's Compound 
+  Discoverer software.
 Imports:
     caret,
     dplyr,
