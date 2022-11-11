@@ -50,19 +50,35 @@ tidy_gap_fill_methods <- function(method_data_file) {
 #' @importFrom magrittr %>%
 #' @export
 tidy_mzCloud_hits <- function(mzcloud_data) {
-  # watch out for changes to file formatting
-  if(sum(mzcloud_data$Formula == "Tags", na.rm = TRUE) !=
-     sum(!is.na(mzcloud_data$`Reference Ion`))) {
-    warning("Number of 'Tags' entries in Formula column doesn't match number of reference ions! Check exported spreadsheet for formatting changes!")
+  # check file version -- changed between Compound Discoverer v3.0 and 3.3
+  if(!is.na(match("Calc. MW", names(mzcloud_data)))) {
+    # new, post-3.3 format
+    cd_format <- 2
+  } else if(!is.na(match("Molecular Weight", names(mzcloud_data)))) {
+    # old, pre-3.3 format
+    cd_format <- 1
+  } else {
+    # unrecognized format
+    warning("mzCloud match table has unrecognized format! tidy_mzCloud_hits may fail. Please check file format.")
   }
 
-  # actual feature rows always list reference ion
-  feature_idx <- which(!is.na(mzcloud_data$`Reference Ion`))
+  if(cd_format == 1) {
+    # 'checked' column is only NA in inner data
+    feature_idx <- which(!is.na(mzcloud_data$Checked))
 
-  mzcloud_features <- mzcloud_data %>%
-    dplyr::slice(feature_idx) %>%
-    # generate feature IDs
-    dplyr::mutate(Feature_ID = paste0(`Calc. MW`, "@", `RT [min]`))
+    mzcloud_features <- mzcloud_data %>%
+      dplyr::slice(feature_idx) %>%
+      # generate feature IDs
+      dplyr::mutate(Feature_ID = paste0(`Molecular Weight`, "@", `RT [min]`))
+  } else {
+    # actual feature rows always list reference ion
+    feature_idx <- which(!is.na(mzcloud_data$`Reference Ion`))
+
+    mzcloud_features <- mzcloud_data %>%
+      dplyr::slice(feature_idx) %>%
+      # generate feature IDs
+      dplyr::mutate(Feature_ID = paste0(`Calc. MW`, "@", `RT [min]`))
+  }
 
   # pull out column names for the mzCloud hit tables
   hit_cols <- c(as.character(mzcloud_data[2, ]), "Feature_ID")
