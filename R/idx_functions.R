@@ -69,7 +69,8 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
     mzcloud_features <- mzcloud_data %>%
       dplyr::slice(feature_idx) %>%
       # generate feature IDs
-      dplyr::mutate(Feature_ID = paste0(`Molecular Weight`, "@", `RT [min]`))
+      dplyr::mutate(Feature_ID = paste0(as.numeric(`Molecular Weight`), "@",
+                                        as.numeric(`RT [min]`)))
   } else {
     # actual feature rows always list reference ion
     feature_idx <- which(!is.na(mzcloud_data$`Reference Ion`))
@@ -77,7 +78,8 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
     mzcloud_features <- mzcloud_data %>%
       dplyr::slice(feature_idx) %>%
       # generate feature IDs
-      dplyr::mutate(Feature_ID = paste0(`Calc. MW`, "@", `RT [min]`))
+      dplyr::mutate(Feature_ID = paste0(as.numeric(`Calc. MW`), "@",
+                                        as.numeric(`RT [min]`)))
   }
 
   # pull out column names for the mzCloud hit tables
