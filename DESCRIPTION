@@ -1,7 +1,7 @@
 Package: jrtools
 Type: Package
 Title: Miscellaneous Statistical and Graphing Utilities
-Version: 0.3.1
+Version: 0.3.2
 Author: Dr. John I. Robinson, PhD
 Maintainer: John Robinson <john.robinson@wustl.edu>
 Description: Various functions I (re)use frequently for statistical analyses. 
