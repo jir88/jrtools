@@ -6,7 +6,6 @@
 #'
 #' @return the number of bits of entropy (log base 2) in the data set
 #'
-#' @importFrom magrittr %>%
 #' @export
 entropy <- function(x) {
   freq <- table(x)/length(x)
