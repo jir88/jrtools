@@ -2,6 +2,7 @@
 
 S3method(coef,multi.cv.glmnet)
 S3method(predict,kmeans)
+S3method(reorder,kmeans)
 export(absolute_error)
 export(binomial_deviance)
 export(calc_roc)
@@ -25,3 +26,4 @@ export(tidy_gap_fill_methods)
 export(tidy_mzCloud_hits)
 importFrom(foreach,"%dopar%")
 importFrom(magrittr,"%>%")
+importFrom(stats,reorder)
