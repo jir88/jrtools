@@ -18,6 +18,7 @@ Imports:
     MSnbase,
     purrr,
     readr,
+    readxl,
     stats,
     stringr,
     tibble,
