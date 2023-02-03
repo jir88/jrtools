@@ -104,7 +104,6 @@ ggally_adj_cor <- function(
 
       # if we need to adjust the p-values
       if(p_adjust_method != "none") {
-        message("adjusting")
         corObj$p.value <- stats::p.adjust(p = corObj$p.value,
                                           method = p_adjust_method,
                                           n = p_adjust_n)
