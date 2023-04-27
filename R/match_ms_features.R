@@ -18,6 +18,7 @@
 #' @return A tibble of feature matches
 #'
 #' @importFrom magrittr %>%
+#' @importFrom rlang .data
 #' @export
 match_ms_features <- function(mz1, rt1, mz2, rt2, ppm_range = c(-5, 5),
                              drt_range = c(-0.5, 0.5)) {
@@ -31,15 +32,15 @@ match_ms_features <- function(mz1, rt1, mz2, rt2, ppm_range = c(-5, 5),
 
   feature_comparison <- tibble::as_tibble(delta_mass, rownames = "Feature1",
                                           .name_repair = "minimal") %>%
-    tidyr::pivot_longer(cols = -Feature1, names_to = "Feature2", values_to = "ppm") %>%
-    dplyr::filter(between(ppm, ppm_range[1], ppm_range[2])) %>%
-    dplyr::mutate(mz1 = mz1[match(Feature1, rownames(delta_mass))],
-                  rt1 = rt1[match(Feature1, rownames(delta_mass))]) %>%
-    dplyr::mutate(mz2 = mz2[match(Feature2, colnames(delta_mass))],
-                  rt2 = rt2[match(Feature2, colnames(delta_mass))]) %>%
+    tidyr::pivot_longer(cols = -.data$Feature1, names_to = "Feature2", values_to = "ppm") %>%
+    dplyr::filter(dplyr::between(.data$ppm, ppm_range[1], ppm_range[2])) %>%
+    dplyr::mutate(mz1 = mz1[match(.data$Feature1, rownames(delta_mass))],
+                  rt1 = rt1[match(.data$Feature1, rownames(delta_mass))]) %>%
+    dplyr::mutate(mz2 = mz2[match(.data$Feature2, colnames(delta_mass))],
+                  rt2 = rt2[match(.data$Feature2, colnames(delta_mass))]) %>%
     dplyr::mutate(dRT = rt1 - rt2) %>%
-    dplyr::filter(between(dRT, drt_range[1], drt_range[2])) %>%
-    dplyr::relocate(ppm, .before = dRT)
+    dplyr::filter(dplyr::between(.data$dRT, drt_range[1], drt_range[2])) %>%
+    dplyr::relocate(.data$ppm, .before = .data$dRT)
 
   return(feature_comparison)
 }

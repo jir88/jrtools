@@ -10,7 +10,7 @@ match_ms_features(
   mz2,
   rt2,
   ppm_range = c(-5, 5),
-  drt_range = c(0.5, 0.5)
+  drt_range = c(-0.5, 0.5)
 )
 }
 \arguments{
