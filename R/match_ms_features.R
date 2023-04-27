@@ -20,7 +20,7 @@
 #' @importFrom magrittr %>%
 #' @export
 match_ms_features <- function(mz1, rt1, mz2, rt2, ppm_range = c(-5, 5),
-                             drt_range = c(0.5, 0.5)) {
+                             drt_range = c(-0.5, 0.5)) {
   # find close masses (within 25 ppm)
   delta_mass <- outer(mz1, mz2,
                       FUN = function(x, y) { return((x - y)/y*1e6) })
