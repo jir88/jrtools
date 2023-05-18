@@ -4,7 +4,7 @@
 #' imports all spectra in a single library and converts the data into a tidy
 #' format.
 #'
-#' @param f First set of mass or m/z values
+#' @param f Path to file containing a spectral library in SQLite format.
 #'
 #' @return A list containing the library data tables.
 #'
