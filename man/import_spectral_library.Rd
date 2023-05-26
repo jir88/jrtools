@@ -7,7 +7,7 @@
 import_spectral_library(f)
 }
 \arguments{
-\item{f}{First set of mass or m/z values}
+\item{f}{Path to file containing a spectral library in SQLite format.}
 }
 \value{
 A list containing the library data tables.
