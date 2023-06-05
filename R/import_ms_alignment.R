@@ -24,7 +24,10 @@ import_ms_alignment <- function(f) {
   # TODO: set up separate methods for importing certain table(s)?
 
   # what are the Compound Table headers?
-  # DBI::dbListFields(con, "MassSpectrumItems")
+  # DBI::dbListFields(con, "XicTraceItems")
+
+  # read XIC traces
+  xic_trace_items <- DBI::dbReadTable(con, "XicTraceItems")
 
   # read mass spectrum items
   spectrum_items <- DBI::dbReadTable(con, "MassSpectrumItems")
@@ -54,15 +57,17 @@ import_ms_alignment <- function(f) {
               UnknownCompounds = consolidated_unk_comp_items,
               UnknownCompoundSpectra = spectrum_items,
               mzCloudHits = consolidated_unk_comp_items_mzcloud_hits,
-              mzCloudHitSpectra = library_spectrum_items))
+              mzCloudHitSpectra = library_spectrum_items,
+              xicTraceItems = xic_trace_items))
 
   # pull some spectrum blobs
-  # blob_mass <- library_spectrum_items$Spectrum[[2]]
+  # blob_mass <- xic_trace_items$Trace[[2]]
   # # these are zipped XML files in same format as feature spectra
   #
-  # writeBin(blob_mass, "test.bin")
-  # df <- readBin(blob_mass, numeric(), n = length(blob_mass)/8)
+  # writeBin(blob_mass, "test2.bin")
   #
+  # df <- extract_xic_blob(blb = xic_trace_items$Trace[[2]])
+
   # # parse the spectral blobs
   # spec_masses <- lapply(spec_table$blobMass, FUN = function(b) {
   #   return(readBin(b, numeric(), n = length(b)/8))
