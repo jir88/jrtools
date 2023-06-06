@@ -24,7 +24,17 @@ import_ms_alignment <- function(f) {
   # TODO: set up separate methods for importing certain table(s)?
 
   # what are the Compound Table headers?
-  # DBI::dbListFields(con, "XicTraceItems")
+  DBI::dbListFields(con, "CorrectionCurveItems")
+
+  # read predicted elemental compositions of items
+  # rt_raster <- DBI::dbReadTable(con, "RetentionTimeRasterItem")
+
+  # read predicted elemental compositions of items
+  predicted_compositions <- DBI::dbReadTable(con, "PredictedCompositionItem")
+
+  # read retention time correction curves and
+  # extract binary blobs with curves inside
+  corr_curve_items <- extract_rt_corrections(DBI::dbReadTable(con, "CorrectionCurveItems"))
 
   # read XIC traces
   xic_trace_items <- DBI::dbReadTable(con, "XicTraceItems")
@@ -58,7 +68,9 @@ import_ms_alignment <- function(f) {
               UnknownCompoundSpectra = spectrum_items,
               mzCloudHits = consolidated_unk_comp_items_mzcloud_hits,
               mzCloudHitSpectra = library_spectrum_items,
-              xicTraceItems = xic_trace_items))
+              PredictedCompositions = predicted_compositions,
+              XICTraceItems = xic_trace_items,
+              CorrectionCurveItems = corr_curve_items))
 
   # pull some spectrum blobs
   # blob_mass <- xic_trace_items$Trace[[2]]
@@ -141,4 +153,46 @@ import_ms_alignment <- function(f) {
   # blob_mass <- spec_table$blobNoises[[1]]
   # writeBin(blob_mass, "test.bin")
   # df <- readBin(blob_mass, numeric(), n = length(blob_mass)/8)
+}
+
+# internal function that parses RT correction data
+extract_rt_corrections <- function(rt_corr_tbl) {
+  # retention times are 32-bit integers
+  # not sure what time format this is, if any
+  # first integer is just the length of the array...
+  retention_times <- lapply(rt_corr_tbl$RetentionTimes, FUN = function(b) {
+    return(readBin(b, "integer", n = length(b)/8, size = 8)[-1])
+  })
+
+  corr_values <- lapply(rt_corr_tbl$CorrectionValues, FUN = function(b) {
+    return(readBin(b, "integer", n = length(b)/8, size = 8)[-1])
+  })
+
+  pred_tols <- lapply(rt_corr_tbl$PredictionTolerances, FUN = function(b) {
+    return(readBin(b, "integer", n = length(b)/8, size = 8)[-1])
+  })
+
+  df <- lapply(X = 1:length(retention_times), FUN = function(i) {
+    return(tibble::tibble(WorkflowId = rt_corr_tbl$WorkflowId[[i]],
+                          ID = rt_corr_tbl$ID[[i]],
+                          RetentionTimes = retention_times[[i]],
+                          CorrectionValues = corr_values[[i]],
+                          PredictionTolerances = pred_tols[[i]]))
+  })
+  return(dplyr::bind_rows(df))
+}
+
+#' Fix a 32 bit unsigned integer that has been read as signed
+#'
+#' This is really just to fix a limitation of readBin/R's 32 bit signed ints
+#' @param x Number to be fixed
+#' @param adjustment number to be added to convert to uint32 (2^32 by default)
+#' @return numeric value of uint32
+#' @author jefferis
+#' @seealso \code{\link{readBin}}
+ConvertIntToUInt<-function(x,adjustment=2^32){
+  x=as.numeric(x)
+  signs=sign(x)
+  x[signs<0]=x[signs<0]+adjustment
+  x
 }
