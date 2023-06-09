@@ -11,6 +11,12 @@
 #' @importFrom rlang .data
 #' @export
 import_ms_alignment <- function(f) {
+  # TODO: rework to only import table data and main unknown compound table?
+  # then write other methods to take alignment list/S3 object and desired IDs for extraction
+  # probably also pull in WorkflowInputFiles so we have the file IDs
+  # TODO: set up query functions to optionally pull subsets of data instead of whole tables
+  # use DBI::dbGetQuery for this purpose
+
   # make a temp directory for unzipping blobs
   # tmp_zip_dir <- tempfile(pattern = "MSA_dir", tmpdir = tempdir())
   # dir.create(tmp_zip_dir)
@@ -18,59 +24,64 @@ import_ms_alignment <- function(f) {
   # connect to the alignment database
   con <- DBI::dbConnect(RSQLite::SQLite(), f)
 
-  # which tables are available?
-  all_tables <- DBI::dbListTables(con)
-  # TODO: import more tables?
-  # TODO: set up separate methods for importing certain table(s)?
-
-  # what are the Compound Table headers?
-  DBI::dbListFields(con, "CorrectionCurveItems")
-
-  # read predicted elemental compositions of items
-  # rt_raster <- DBI::dbReadTable(con, "RetentionTimeRasterItem")
-
-  # read predicted elemental compositions of items
-  predicted_compositions <- DBI::dbReadTable(con, "PredictedCompositionItem")
-
-  # read retention time correction curves and
-  # extract binary blobs with curves inside
-  corr_curve_items <- extract_rt_corrections(DBI::dbReadTable(con, "CorrectionCurveItems"))
-
-  # read XIC traces
-  xic_trace_items <- DBI::dbReadTable(con, "XicTraceItems")
-
-  # read mass spectrum items
-  spectrum_items <- DBI::dbReadTable(con, "MassSpectrumItems")
-  # this table has all the spectra associated with a compound
-  # actual centroided spectra are stored as blobs -- use extract_spectral_blob
-  # to get individual spectra
+  # read input files table
+  input_files <- DBI::dbReadTable(con, "WorkflowInputFiles")
 
   # read unknown compound items
   consolidated_unk_comp_items <- DBI::dbReadTable(con, "ConsolidatedUnknownCompoundItems")
   # this table is the main compounds table seen in CD
   # some of the info flags are encoded as binary blobs
 
-  # read mzCloud search result items
-  consolidated_unk_comp_items_mzcloud_hits <- DBI::dbReadTable(con, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
-  # this is the sub-table for mzCloud hits for each compound that has any
-  # ID values point to associated compounds, library spectra, etc.
+  # build S3 object with class ms_alignment
+  msa <- list(db_file = f,
+              db_connection = con,
+              input_files = input_files,
+              unknown_compound_items = consolidated_unk_comp_items)
+  class(msa) <- "ms_alignment"
 
-  # read library spectrum items
-  library_spectrum_items <- DBI::dbReadTable(con, "LibrarySpectrumItems")
-  # contains centroided spectra associated with mzCloud matches
-  # same blob format as compound spectra, so can extract the same way
+  return(msa)
 
-  # disconnect cleanly
-  DBI::dbDisconnect(con)
-
-  return(list(AvailableTableNames = all_tables,
-              UnknownCompounds = consolidated_unk_comp_items,
-              UnknownCompoundSpectra = spectrum_items,
-              mzCloudHits = consolidated_unk_comp_items_mzcloud_hits,
-              mzCloudHitSpectra = library_spectrum_items,
-              PredictedCompositions = predicted_compositions,
-              XICTraceItems = xic_trace_items,
-              CorrectionCurveItems = corr_curve_items))
+  # # which tables are available?
+  # all_tables <- DBI::dbListTables(con)
+  # # TODO: import more tables?
+  # # TODO: set up separate methods for importing certain table(s)?
+  #
+  # # what are the Compound Table headers?
+  # DBI::dbListFields(con, "WorkflowInputFilesFileAlignmentCorrectionItems")
+  #
+  # # read predicted elemental compositions of items
+  # # rt_raster <- DBI::dbReadTable(con, "RetentionTimeRasterItem")
+  #  #
+  # # read retention time correction curves and
+  # # extract binary blobs with curves inside
+  # corr_curve_items <- extract_rt_corrections(DBI::dbReadTable(con, "CorrectionCurveItems"))
+  # # read extra metadata for identifying the associated correction files
+  # corr_curv_file_ids <- DBI::dbReadTable(con, "WorkflowInputFilesFileAlignmentCorrectionItems")
+  #
+  # # read XIC traces
+  # xic_trace_items <- DBI::dbReadTable(con, "XicTraceItems")
+  #
+  # # read mzCloud search result items
+  # consolidated_unk_comp_items_mzcloud_hits <- DBI::dbReadTable(con, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
+  # # this is the sub-table for mzCloud hits for each compound that has any
+  # # ID values point to associated compounds, library spectra, etc.
+  #
+  # # read library spectrum items
+  # library_spectrum_items <- DBI::dbReadTable(con, "LibrarySpectrumItems")
+  # # contains centroided spectra associated with mzCloud matches
+  # # same blob format as compound spectra, so can extract the same way
+  #
+  # # disconnect cleanly
+  # DBI::dbDisconnect(con)
+  #
+  # return(list(AvailableTableNames = all_tables,
+  #             UnknownCompounds = consolidated_unk_comp_items,
+  #             UnknownCompoundSpectra = spectrum_items,
+  #             mzCloudHits = consolidated_unk_comp_items_mzcloud_hits,
+  #             mzCloudHitSpectra = library_spectrum_items,
+  #             PredictedCompositions = predicted_compositions,
+  #             XICTraceItems = xic_trace_items,
+  #             CorrectionCurveItems = corr_curve_items))
 
   # pull some spectrum blobs
   # blob_mass <- xic_trace_items$Trace[[2]]
