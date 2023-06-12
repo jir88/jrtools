@@ -90,3 +90,41 @@ get_compound_spectra <- function(msa, ids = NULL) {
 
   return(bhi_spectra)
 }
+
+#' Retrieve cloud spectral library matches
+#'
+#' Queries a mass spec alignment database to get the cloud-based spectral libary
+#' matches for some or all compounds.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get matches for, or NULL to get all matches
+#'
+#' @return A tibble with the cloud library matches
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+get_spectral_cloud_matches <- function(msa, ids = NULL) {
+  if(is.null(ids)) {
+    # get the mzCloud hit IDs associated with all compounds
+    df <- DBI::dbReadTable(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
+    # read predicted elemental compositions of all items
+    mzcloud_hits <- DBI::dbReadTable(msa$db_connection, "MzCloudHitItems")
+    # merge tables
+    mzcloud_hits <- dplyr::full_join(x = df, y = mzcloud_hits,
+                                               by = c("MzCloudHitItemsID" = "ID"))
+  } else {
+    # get the composition IDs associated with compounds of interest
+    mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
+    query_mzcloud_ids <- dplyr::filter(mzcloud_id_tbl, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+    # read predicted elemental compositions of those items
+    mzcloud_hit_tbl <- dplyr::tbl(msa$db_connection, "MzCloudHitItems")
+
+    mzcloud_hits <- dplyr::left_join(x = query_mzcloud_ids, y = mzcloud_hit_tbl,
+                                               by = c("MzCloudHitItemsID" = "ID"))
+    # get local copy of the data
+    mzcloud_hits <- dplyr::collect(mzcloud_hits)
+  }
+
+  return(mzcloud_hits)
+}
