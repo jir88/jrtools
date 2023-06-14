@@ -23,7 +23,7 @@ extract_spectral_blob <- function(blb, zip_dir = tempdir()) {
   # read an XML spectrum
   xml_dir <- read_zip_blob(zb = blb, blob_path = zip_dir)
   # should only be the one
-  xml_file <- list.files(xml_dir)
+  xml_file <- list.files(xml_dir, full.names = TRUE)
   # load the XML document
   spec_xml <- xml2::read_xml(xml_file)
   # turn it into a list
