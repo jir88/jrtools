@@ -129,6 +129,51 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
   return(mzcloud_hits)
 }
 
+#' Extract predicted isotopologue pattern data from an SQLite blob
+#'
+#' Certain mass spec data alignment formats store predicted isotopologue spectra
+#' as SQLite blobs containing a compressed XML file. This function extracts the
+#' stored data from such blobs.
+#'
+#' @param blb A raw vector containing an SQLite blob of isotopologue data
+#' @param zip_dir Directory where XML files should be unzipped
+#'
+#' @return A tibble containing the isotopologue pattern
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+extract_isotope_pattern_blob <- function(blb, zip_dir = tempdir()) {
+  # spectrum blobs are zipped XML files
+  # format looks custom, but is human readable
+  # contains scan info and centroided spectra
+
+  # read an XML spectrum
+  xml_dir <- read_zip_blob(zb = blb, blob_path = zip_dir)
+  # should only be the one
+  xml_file <- list.files(xml_dir, full.names = TRUE)
+  # load the XML document
+  spec_xml <- xml2::read_xml(xml_file)
+
+  # pull out the pattern node and shove it into a tidy tibble
+  pattern_peak_data <- xml2::xml_child(spec_xml, search = "PatternPeaks") %>%
+    # get peak nodes
+    xml2::xml_children() %>%
+    # pull attribute data
+    xml2::xml_attrs() %>%
+    # mash into a tibble
+    dplyr::bind_rows() %>%
+    # convert text to numbers
+    dplyr::mutate(mz = as.numeric(.data$X),
+                  intensity = as.numeric(.data$Y),
+                  charge = as.numeric(.data$Z),
+                  resolution = as.numeric(.data$R),
+                  signalNoiseRatio = as.numeric(.data$SN),
+                  .keep = "none")
+
+  return(pattern_peak_data)
+}
+
 # unzip a blob from the database
 # zb: the blob
 # path: directory to put unzipped blob in
