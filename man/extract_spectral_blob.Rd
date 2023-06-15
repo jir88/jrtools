@@ -12,7 +12,7 @@ extract_spectral_blob(blb, zip_dir = tempdir())
 \item{zip_dir}{Directory where XML files should be unzipped}
 }
 \value{
-A list containing the library data tables.
+A tibble containing the mass spectrum.
 }
 \description{
 Certain mass spec data alignment formats store feature spectra as SQLite

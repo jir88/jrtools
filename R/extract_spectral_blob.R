@@ -10,7 +10,7 @@
 #' @param blb A raw vector containing an SQLite blob of spectral data
 #' @param zip_dir Directory where XML files should be unzipped
 #'
-#' @return A list containing the library data tables.
+#' @return A tibble containing the mass spectrum.
 #'
 #' @importFrom magrittr %>%
 #' @importFrom rlang .data
