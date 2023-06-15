@@ -128,3 +128,19 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
 
   return(mzcloud_hits)
 }
+
+# unzip a blob from the database
+# zb: the blob
+# path: directory to put unzipped blob in
+# returns: path to directory with blob's contents
+read_zip_blob <- function(zb, blob_path) {
+  # write blob to file
+  tmp_blob_file <- tempfile(tmpdir = blob_path, fileext = ".zip")
+  writeBin(zb, tmp_blob_file)
+  # create subdir for this blob's contents
+  blob_content_dir <- tempfile(tmpdir = blob_path)
+  # extract to directory
+  zip::unzip(tmp_blob_file, exdir = blob_content_dir)
+  # return directory path so we can do stuff with the contents
+  return(blob_content_dir)
+}
