@@ -254,6 +254,62 @@ extract_isotope_pattern_blob <- function(blb, zip_dir = tempdir()) {
   return(pattern_peak_data)
 }
 
+#' Extract peak areas stored as blobs in a mass spec alignment
+#'
+#' Certain mass spec data alignment formats store peak areas as SQLite blobs
+#' containing the data in binary form. This function extracts the
+#' stored data from such blobs. The returned areas are for the reference adduct
+#' ion for each compound. Other areas must be retrieved manually from the relevant
+#' tables.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get areas for, or NULL to get all peak areas
+#'
+#' @return A tibble containing the peak areas and another containing boolean
+#'  flag reporting whether the peak exists or not
+#'
+#' @importFrom rlang .data
+#' @export
+extract_peak_areas <- function(msa, ids = NULL) {
+  # blobs contain alternating 64-bit floats and a binary byte specifying whether
+  # the area was calculated. Presumably this is to differentiate between true
+  # zeroes and NA values?
+
+  # use all IDs
+  if(is.null(ids)) {
+    ids <- msa$unknown_compound_items$ID
+  }
+  # usually index and ID are the same, but we can't be sure
+  idx <- match(ids, msa$unknown_compound_items$ID)
+
+  area_data <- lapply(X = msa$unknown_compound_items$Area[idx],
+                      FUN = function(blb) {
+                        area_values <- blb[-seq.int(from = 9, to = length(blb), by = 9)]
+                        area_values <- readBin(area_values, what = numeric(), n = length(area_values)/8)
+
+                        area_flags <- blb[seq.int(from = 9, to = length(blb), by = 9)]
+                        area_flags <- readBin(area_flags, what = logical(),
+                                              size = 1, n = length(area_flags))
+                        return(list(area = area_values,
+                                    flag = area_flags))
+                      })
+  area_data <- purrr::transpose(area_data)
+
+  areas <- do.call(rbind, area_data$area)
+  rownames(areas) <- ids
+  areas <- tibble::as_tibble(t(areas), .name_repair = "minimal")
+  areas <- dplyr::mutate(areas, StudyFileID = msa$input_files$StudyFileID,
+                         .before = 1)
+
+  flags <- do.call(rbind, area_data$flag)
+  rownames(flags) <- ids
+  flags <- tibble::as_tibble(t(flags), .name_repair = "minimal")
+  flags <- dplyr::mutate(flags, StudyFileID = msa$input_files$StudyFileID,
+                         .before = 1)
+
+  return(list("areas" = areas, "flags" = flags))
+}
+
 # unzip a blob from the database
 # zb: the blob
 # path: directory to put unzipped blob in
