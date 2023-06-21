@@ -38,6 +38,83 @@ get_elemental_compositions <- function(msa, ids = NULL) {
   return(predicted_compositions)
 }
 
+#' Retrieve chromatogram peaks associated with compounds
+#'
+#' Queries a mass spec alignment database to get all the chromatographic peaks
+#' associated with some or all compounds. This includes all identified adducts.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get peaks for, or NULL to get all peaks
+#'
+#' @return A tibble with the chromatographic peaks
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+get_chromatogram_peaks <- function(msa, ids = NULL) {
+  if(is.null(ids)) {
+    # have to go to the unconsolidated unknown compounds table to get all peaks
+    # get the unconsolidated compound IDs associated with all compounds
+    ucids <- DBI::dbReadTable(msa$db_connection, "ConsolidatedUnknownCompoundItemsUnknownCompoundInstanceItems")
+    # get the table of unconsolidated unknown compounds
+    unk_comp_items <- DBI::dbReadTable(msa$db_connection, "UnknownCompoundInstanceItems")
+    # get the ions associated with unknown compounds
+    iids <- DBI::dbReadTable(msa$db_connection, "UnknownCompoundInstanceItemsUnknownCompoundIonInstanceItems")
+    # get the chromatographic peak IDs associated with unknown compounds
+    cpids <- DBI::dbReadTable(msa$db_connection, "UnknownCompoundIonInstanceItemsChromatogramPeakItems")
+    # get the table of chromatographic peaks
+    chrom_peaks <- DBI::dbReadTable(msa$db_connection, "ChromatogramPeakItems")
+    # merge tables
+    all_chrom_peaks <- dplyr::full_join(ucids, unk_comp_items,
+                                        by = c("UnknownCompoundInstanceItemsWorkflowID" = "WorkflowID",
+                                               "UnknownCompoundInstanceItemsID" = "ID"))
+    all_chrom_peaks <- dplyr::full_join(all_chrom_peaks, iids,
+                                        by = c("UnknownCompoundInstanceItemsWorkflowID",
+                                               "UnknownCompoundInstanceItemsID"))
+    all_chrom_peaks <- dplyr::full_join(all_chrom_peaks, cpids,
+                                        by = c("UnknownCompoundIonInstanceItemsWorkflowID",
+                                               "UnknownCompoundIonInstanceItemsID"))
+    # some chromatographic peaks aren't associated with a compound
+    all_chrom_peaks <- dplyr::left_join(all_chrom_peaks, chrom_peaks,
+                                        by = c("ChromatogramPeakItemsWorkflowID" = "WorkflowID",
+                                               "ChromatogramPeakItemsID" = "ID"),
+                                        suffix = c(".compound", ".peak"))
+  } else {
+    # have to go to the unconsolidated unknown compounds table to get all peaks
+    # get the unconsolidated compound IDs associated with all compounds
+    ucids <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsUnknownCompoundInstanceItems")
+    # get the table of unconsolidated unknown compounds
+    unk_comp_items <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItems")
+    # get the ions associated with unknown compounds
+    iids <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItemsUnknownCompoundIonInstanceItems")
+    # get the chromatographic peak IDs associated with unknown compounds
+    cpids <- dplyr::tbl(msa$db_connection, "UnknownCompoundIonInstanceItemsChromatogramPeakItems")
+    # get the table of chromatographic peaks
+    chrom_peaks <- dplyr::tbl(msa$db_connection, "ChromatogramPeakItems")
+    # get only the peaks associated with the compounds we're interested in
+    all_chrom_peaks <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+    # merge tables
+    all_chrom_peaks <- dplyr::left_join(all_chrom_peaks, unk_comp_items,
+                                        by = c("UnknownCompoundInstanceItemsWorkflowID" = "WorkflowID",
+                                               "UnknownCompoundInstanceItemsID" = "ID"))
+    all_chrom_peaks <- dplyr::left_join(all_chrom_peaks, iids,
+                                        by = c("UnknownCompoundInstanceItemsWorkflowID",
+                                               "UnknownCompoundInstanceItemsID"))
+    all_chrom_peaks <- dplyr::left_join(all_chrom_peaks, cpids,
+                                        by = c("UnknownCompoundIonInstanceItemsWorkflowID",
+                                               "UnknownCompoundIonInstanceItemsID"))
+    # some chromatographic peaks aren't associated with a compound
+    all_chrom_peaks <- dplyr::left_join(all_chrom_peaks, chrom_peaks,
+                                        by = c("ChromatogramPeakItemsWorkflowID" = "WorkflowID",
+                                               "ChromatogramPeakItemsID" = "ID"),
+                                        suffix = c(".compound", ".peak"))
+    # get local copy of the data
+    all_chrom_peaks <- dplyr::collect(all_chrom_peaks)
+  }
+
+  return(all_chrom_peaks)
+}
+
 #' Retrieve spectra associated with compounds
 #'
 #' Queries a mass spec alignment database to get the mass spectra associated with
@@ -108,7 +185,10 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
   if(is.null(ids)) {
     # get the mzCloud hit IDs associated with all compounds
     df <- DBI::dbReadTable(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
-    # read predicted elemental compositions of all items
+    # get mzCloud search results associated with all compounds
+    unk_comp_search_res <- DBI::dbReadTable(msa$db_connection,
+                                            "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
+    # get all mzCloud hits -- less detail, but points to relevant spectra
     mzcloud_hits <- DBI::dbReadTable(msa$db_connection, "MzCloudHitItems")
     # merge tables
     mzcloud_hits <- dplyr::full_join(x = df, y = mzcloud_hits,
