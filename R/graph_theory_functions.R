@@ -59,3 +59,59 @@ knn_trim <- function(graph, k = 3, method = "max", edge_mode = "all") {
 
   return(knn_graph)
 }
+
+#' Find connected k-plexes in networks
+#'
+#' Given an igraph object, this function identifies connected components of
+#' induced subgraphs where all N nodes in the component are connected to at
+#' least N-k other nodes. Thus, a 1-plex is the same as a clique of size N,
+#' because all nodes are connected to each other but not to themselves. A 2-plex
+#' is a clique where some nodes are missing at most one edge to another node.
+#'
+#' WARNING: this method uses an untested algorithm! Use at your own risk! Only
+#' works for connected k-plexes! May not find maximal k-plexes or all k-plexes.
+#' Requires more formalized testing.
+#'
+#' @param g the igraph object to search for k-plexes
+#' @param min_kc The minimum coreness to consider
+#' @param kp the maximum number of missing edges per node in the plex
+#' @return a list containing a list of the k-plex graphs, the minimum degrees of
+#'   each plex, and the sizes of each plex
+#' @details This is a really simplistic kludge. Use at your own risk! May not
+#'   behave as intended!
+#' @export
+find_kplexes <- function(g, min_kc, kp) {
+  sdf_coreness <- igraph::coreness(g)
+  # V(g)$coreness <- sdf_coreness
+
+  plex_list <- c()
+
+  # for each observed k-core
+  for(kc in seq.int(from = max(sdf_coreness), to = min_kc, by = -1)) {
+    # get the k-core
+    kcore <- igraph::induced_subgraph(g, igraph::V(g)[sdf_coreness >= kc])
+    # get a list of the connected components
+    kcore_membership <- igraph::components(kcore)$membership
+    df <- rle(sort(kcore_membership))
+    # a component is a k-plex if its size equals kc + kp
+    plex_idx <- which(df$lengths == kc + kp)
+    # if there are any detected plexes
+    if(length(plex_idx) > 0) {
+      # for each detected plex
+      pl <- lapply(X = df$values[plex_idx], FUN = function(comp_id) {
+        # grab the induced subgraph associated with the plex component's ID
+        return(igraph::induced_subgraph(kcore, igraph::V(kcore)[comp_id == kcore_membership]))
+      })
+      plex_list <- append(plex_list, pl)
+    }
+
+  }
+
+  # what is the minimum degree of the nodes in each plex?
+  plex_min_deg <- sapply(X = plex_list, FUN = function(g) { return(min(igraph::degree(g)))})
+  # how big is each plex?
+  plex_size <- sapply(X = plex_list, FUN = function(g) { return(length(g))})
+
+  return(list(plex_list = plex_list, plex_min_deg = plex_min_deg,
+              plex_size = plex_size))
+}
