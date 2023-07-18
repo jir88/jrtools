@@ -5,7 +5,7 @@
 #' This function extracts the stored data from such blobs.
 #'
 #' The precise format of the binary file has not yet been completely elucidated.
-#' Chunk 1 looks like run time. Chunk 2 is unknown, maybe resolution? Chunk 3
+#' Chunk 1 is unknown. Chunk 2 is the retention time in minutes. Chunk 3
 #' is obviously the XIC itself. Chunk 4 looks like probably the instantaneous
 #' noise level, but might be something else. Subtracting chunk 4 from chunk 3
 #' seems to yield reasonable looking XIC traces.
@@ -42,7 +42,7 @@ extract_xic_blob <- function(blb) {
   # Not clear whether the gaps between chunks are constant or forcing positions
   # to some multiple of some value or something else
   # Limited testing suggests constant gaps for some weird reason
-  # chunk1 or chunk2 is probably time
+  # chunk2 is definitely time in minutes
   start_chunk1 <- 21
   end_chunk1 <- start_chunk1 + seg_len*dsize - 1
   chunk1 <- readBin(df[start_chunk1:end_chunk1], "integer",
@@ -50,7 +50,7 @@ extract_xic_blob <- function(blb) {
 
   start_chunk2 <- end_chunk1 + 4
   end_chunk2 <- start_chunk2 + seg_len*dsize - 1
-  chunk2 <- readBin(df[start_chunk2:end_chunk2], "integer",
+  chunk2 <- readBin(df[start_chunk2:end_chunk2], "double",
                     n = seg_len, size = dsize)
   # this one is the actual XIC
   start_chunk3 <- end_chunk2 + 2
@@ -65,7 +65,7 @@ extract_xic_blob <- function(blb) {
   chunk4 <- readBin(df[start_chunk4:end_chunk4], "integer",
                     n = seg_len, size = dsize)
 
-  xic_data <- tibble::tibble(Time = chunk1, Chunk2 = chunk2,
+  xic_data <- tibble::tibble(Chunk1 = chunk1, Time = chunk2,
                              XICData = chunk3, NoiseThresh = chunk4)
 
   return(xic_data)
