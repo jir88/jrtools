@@ -363,6 +363,56 @@ extract_peak_areas <- function(msa, ids = NULL) {
   return(list("areas" = areas, "flags" = flags))
 }
 
+#' Get retention time corrections for scans in a mass spec alignment
+#'
+#' Certain mass spec data alignment formats store retention time correction data
+#' as SQLite blobs containing the data in binary form. This function extracts the
+#' stored data from such blobs. The returned retention times are presumably for
+#' each scan in the raw data file.
+#'
+#' @param msa An ms_alignment object to query
+#' @param file_id ID numbers for the file retention time corrections to return,
+#'  or NULL to return all of them
+#'
+#' @return A tibble containing the original and corrected retention times for
+#' each file in minutes.
+#'
+#' @importFrom rlang .data
+#' @export
+get_file_rt_corrections <- function(msa, file_id = NULL) {
+  if(is.null(file_id)) {
+    file_id <- msa$input_files$FileID
+  }
+
+  fa_cor_tbl <- dplyr::tbl(msa$db_connection, "FileAlignmentCorrectionItems")
+  fa_cor_tbl <- dplyr::filter(fa_cor_tbl, .data$FileID %in% file_id)
+  fa_cor_tbl <- dplyr::collect(fa_cor_tbl)
+
+  # read retention time blobs
+  rt_corrections <- lapply(X = seq.int(from = 1, to = nrow(fa_cor_tbl), by = 1), FUN = function(r) {
+    # original retention times
+    rt_blob <- fa_cor_tbl$OriginalRT[[r]]
+    # grab length of blob
+    blob_len <- readBin(rt_blob[1:4], n = 1, what = "integer", size = 4, endian = "little")
+    # this is actually a blob of 64-bit doubles, NOT integers, idiot
+    orig_rt <- readBin(rt_blob[-1:-4], n = blob_len, what = "double", size = 8,
+                       endian = "little")
+    # corrected retention times
+    rt_blob <- fa_cor_tbl$CorrectedRT[[r]]
+    # grab length of blob
+    blob_len <- readBin(rt_blob[1:4], n = 1, what = "integer", size = 4, endian = "little")
+    # this is actually a blob of 64-bit doubles, NOT integers, idiot
+    corr_rt <- readBin(rt_blob[-1:-4], n = blob_len, what = "double", size = 8,
+                       endian = "little")
+    return(tibble::tibble(OriginalRT = orig_rt, CorrectedRT = corr_rt))
+  })
+  names(rt_corrections) <- fa_cor_tbl$StudyFileID
+  rt_corrections <- dplyr::bind_rows(rt_corrections, .id = "StudyFileID")
+  rt_corrections <- dplyr::full_join(x = dplyr::select(fa_cor_tbl, "WorkflowId":"StudyFileID"),
+                                     y = rt_corrections, by = "StudyFileID")
+  return(rt_corrections)
+}
+
 # unzip a blob from the database
 # zb: the blob
 # path: directory to put unzipped blob in
