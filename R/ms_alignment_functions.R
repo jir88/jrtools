@@ -78,6 +78,54 @@ get_elemental_compositions <- function(msa, ids = NULL) {
   return(predicted_compositions)
 }
 
+#' Get all ions associated with particular compounds
+#'
+#' Queries a mass spec alignment database to get all ions associated with each
+#' compound on a per file basis.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get ions for, or NULL to get all best ions
+#'
+#' @return A tibble with the ion data
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+get_compound_ions <- function(msa, ids = NULL) {
+  if(is.null(ids)) {
+    ids <- msa$unknown_compound_items$ID
+  }
+
+  # have to go to the unconsolidated unknown compounds table to get all ions
+  # get the unconsolidated compound IDs associated with all compounds
+  ucids <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsUnknownCompoundInstanceItems")
+  # get the table of unconsolidated unknown compounds
+  unk_comp_items <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItems")
+  # get the ion IDs associated with unknown compounds
+  iids <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItemsUnknownCompoundIonInstanceItems")
+  # get the actual ion table
+  cpids <- dplyr::tbl(msa$db_connection, "UnknownCompoundIonInstanceItems")
+
+  # get only the ions associated with the compounds we're interested in
+  all_ions <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+  # merge tables
+  all_ions <- dplyr::left_join(all_ions, unk_comp_items,
+                                      by = c("UnknownCompoundInstanceItemsWorkflowID" = "WorkflowID",
+                                             "UnknownCompoundInstanceItemsID" = "ID"))
+  all_ions <- dplyr::left_join(all_ions, iids,
+                                      by = c("UnknownCompoundInstanceItemsWorkflowID",
+                                             "UnknownCompoundInstanceItemsID"))
+  all_ions <- dplyr::left_join(all_ions, cpids,
+                                      by = c("UnknownCompoundIonInstanceItemsWorkflowID" = "WorkflowID",
+                                             "UnknownCompoundIonInstanceItemsID" = "ID",
+                                             "FileID", "StudyFileID", "IdentifyingNodeNumber"),
+                               suffix = c(".compound", ".ion"))
+  # get local copy of the data
+  all_ions <- dplyr::collect(all_ions)
+
+  return(all_ions)
+}
+
 #' Retrieve chromatogram peaks associated with compounds
 #'
 #' Queries a mass spec alignment database to get all the chromatographic peaks
@@ -412,6 +460,8 @@ extract_peak_areas <- function(msa, ids = NULL) {
   }
   # usually index and ID are the same, but we can't be sure
   idx <- match(ids, msa$unknown_compound_items$ID)
+  # get only study file IDs that were actually integrated (Sample, QC, and Blank)
+  sfids <- msa$input_files$StudyFileID[which(msa$input_files$SampleType != "Identification Only")]
 
   area_data <- lapply(X = msa$unknown_compound_items$Area[idx],
                       FUN = function(blb) {
@@ -429,13 +479,13 @@ extract_peak_areas <- function(msa, ids = NULL) {
   areas <- do.call(rbind, area_data$area)
   rownames(areas) <- ids
   areas <- tibble::as_tibble(t(areas), .name_repair = "minimal")
-  areas <- dplyr::mutate(areas, StudyFileID = msa$input_files$StudyFileID,
+  areas <- dplyr::mutate(areas, StudyFileID = sfids,
                          .before = 1)
 
   flags <- do.call(rbind, area_data$flag)
   rownames(flags) <- ids
   flags <- tibble::as_tibble(t(flags), .name_repair = "minimal")
-  flags <- dplyr::mutate(flags, StudyFileID = msa$input_files$StudyFileID,
+  flags <- dplyr::mutate(flags, StudyFileID = sfids,
                          .before = 1)
 
   return(list("areas" = areas, "flags" = flags))
@@ -491,6 +541,45 @@ get_file_rt_corrections <- function(msa, file_id = NULL) {
   return(rt_corrections)
 }
 
+extract_rt_raster_trace <- function(msa, file_id = NULL) {
+  if(is.null(file_id)) {
+    file_id <- msa$input_files$FileID
+  }
+
+  rt_raster_tbl <- dplyr::tbl(msa$db_connection, "RetentionTimeRasterItem")
+  rt_raster_tbl <- dplyr::filter(rt_raster_tbl, .data$FileID %in% file_id)
+  rt_raster_tbl <- dplyr::collect(rt_raster_tbl)
+
+  data_start <- 23
+  traces <- lapply(X = rt_raster_tbl$Trace, FUN = function(compr_data) {
+    # gunzip the data
+    trace_data <- memDecompress(compr_data, type = "gzip")
+    # how long are the chunks?
+    chunk_len <- readBin(trace_data[18:21], what = "integer", n = 1, size = 4)
+    # read the scan numbers (?)
+    scan_index_end <- data_start + 4*chunk_len
+    scan_index <- readBin(trace_data[data_start:(scan_index_end)],
+                          what = "integer", n = chunk_len, size = 4)
+    # next chunk
+    chunk2_end <- scan_index_end + 2 + 4*chunk_len
+    chunk2 <- readBin(trace_data[(scan_index_end + 1):(chunk2_end)],
+                      what = "integer", n = chunk_len, size = 4)
+    # next chunk, possibly alignment graph
+    chunk3_end <- chunk2_end + 2 + 4*chunk_len
+    chunk3 <- readBin(trace_data[(chunk2_end + 1):(chunk3_end)],
+                      what = "integer", n = chunk_len, size = 4)
+    return(tibble(Chunk1 = scan_index,
+                  Chunk2 = chunk2,
+                  Chunk3 = chunk3))
+  })
+  names(traces) <- rt_raster_tbl$ID
+  traces <- bind_rows(traces, .id = "ID")
+  traces <- mutate(traces, ID = as.numeric(ID))
+  df <- full_join(select(rt_raster_tbl, -Trace), traces, by = "ID")
+
+  return(df)
+}
+
 # unzip a blob from the database
 # zb: the blob
 # path: directory to put unzipped blob in
@@ -506,3 +595,5 @@ read_zip_blob <- function(zb, blob_path) {
   # return directory path so we can do stuff with the contents
   return(blob_content_dir)
 }
+
+
