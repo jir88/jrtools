@@ -19,7 +19,7 @@ This function extracts the stored data from such blobs.
 }
 \details{
 The precise format of the binary file has not yet been completely elucidated.
-Chunk 1 looks like run time. Chunk 2 is unknown, maybe resolution? Chunk 3
+Chunk 1 is unknown. Chunk 2 is the retention time in minutes. Chunk 3
 is obviously the XIC itself. Chunk 4 looks like probably the instantaneous
 noise level, but might be something else. Subtracting chunk 4 from chunk 3
 seems to yield reasonable looking XIC traces.
