@@ -18,6 +18,12 @@
 #' @param xic_error_max Maximum XIC error to consider (range 0-1).
 #' @param bp_param Optional BiocParallelParam object describing parallel processing to be used. Defaults to serial processing if not supplied.
 #'
+#' @details
+#' When comparing peak shapes, this algorithm uses XICs from the file where
+#' either compound is highest. This process only uses files marked as 'Sample' or
+#' 'Quality Control' in the original alignment so that the peak shapes represent
+#' behavior in real samples.
+#'
 #' @return A list containing:\tabular{ll}{
 #'    \code{matched_compound_pairs} \tab Table of all matching pairs of compounds. \cr
 #'    \code{sdf_graph} \tab Network object constructed from compound pairs. \cr
@@ -100,18 +106,90 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
 
   ## Pull retention time windows for each match ----
 
+  # get list of files in run time order
+  ms_file_order <- msa$input_files %>%
+    # drop extra files, only want ones used for integration
+    dplyr::filter(.data$SampleType %in% c("Sample", "Quality Control")) %>%
+    dplyr::mutate(CreationDate = strptime(.data$CreationDate, "%m/%d/%Y %H:%M:%S")) %>%
+    dplyr::arrange(.data$CreationDate)
+
+
+  # TODO: set this up to run for old data!
+  # NOTE: for older alignments, need to use heuristic to choose reference ions
+  # match_ions <- jrtools::get_compound_ions(msa = msa, ids = unique(area_cor_matches$CID1)) %>%
+  #   # in case of ties, use the more abundant ion
+  #   group_by(ConsolidatedUnknownCompoundItemsID, IonDescription) %>%
+  #   summarise(IonCount = n(),
+  #             IonTotal = sum(Area.ion),
+  #             .groups = "drop_last") %>%
+  #   # sort more abundant first
+  #   arrange(desc(IonTotal), .by_group = TRUE) %>%
+  #   # take most used/most abundant if tied
+  #   slice_max(order_by = IonCount, n = 1, with_ties = FALSE)
+
+
+  # get ion info so we can select only reference ions for consideration.
+  # for efficiency, we grab all of it at once
+  match_ions <- jrtools::get_compound_ions(msa = msa, ids = unique(c(area_cor_matches$CID1,
+                                                                     area_cor_matches$CID2))) %>%
+    # keep only ID columns and the ion description and charge
+    dplyr::select(ConsolidatedUnknownCompoundItemsID, UnknownCompoundInstanceItemsWorkflowID,
+           UnknownCompoundInstanceItemsID, UnknownCompoundIonInstanceItemsWorkflowID,
+           UnknownCompoundIonInstanceItemsID, IonDescription, Charge)
+
+  # get most intense peaks from the set of files we're willing to use
   match_pks1 <- jrtools::get_chromatogram_peaks(msa = msa,
                                                 ids = unique(area_cor_matches$CID1)) %>%
+    # keep only reference isotopologues
     dplyr::filter(.data$IsRefPeak == 1) %>%
+    dplyr::left_join(match_ions, by = c("ConsolidatedUnknownCompoundItemsID",
+                                        "UnknownCompoundInstanceItemsWorkflowID",
+                                        "UnknownCompoundInstanceItemsID",
+                                        "UnknownCompoundIonInstanceItemsWorkflowID",
+                                        "UnknownCompoundIonInstanceItemsID")) %>%
+    # only consider peaks using the reference ion for that feature
+    dplyr::filter(.data$ReferenceIon == .data$IonDescription) %>%
+    dplyr::filter(.data$StudyFileID.peak %in% ms_file_order$StudyFileID) %>%
     dplyr::group_by(.data$ConsolidatedUnknownCompoundItemsID) %>%
     dplyr::slice_max(order_by = .data$Area.peak, n = 1) %>%
-    dplyr::mutate(Polarity = sign(as.numeric(stringr::str_sub(.data$ReferenceIon, start = -2))))
+    dplyr::mutate(Polarity = sign(.data$Charge))
   match_pks2 <- jrtools::get_chromatogram_peaks(msa = msa,
                                                 ids = unique(area_cor_matches$CID2)) %>%
+    # keep only reference isotopologues
     dplyr::filter(.data$IsRefPeak == 1) %>%
+    dplyr::left_join(match_ions, by = c("ConsolidatedUnknownCompoundItemsID",
+                                        "UnknownCompoundInstanceItemsWorkflowID",
+                                        "UnknownCompoundInstanceItemsID",
+                                        "UnknownCompoundIonInstanceItemsWorkflowID",
+                                        "UnknownCompoundIonInstanceItemsID")) %>%
+    # only consider peaks using the reference ion for that feature
+    dplyr::filter(.data$ReferenceIon == .data$IonDescription) %>%
+    dplyr::filter(.data$StudyFileID.peak %in% ms_file_order$StudyFileID) %>%
     dplyr::group_by(.data$ConsolidatedUnknownCompoundItemsID) %>%
     dplyr::slice_max(order_by = .data$Area.peak, n = 1) %>%
-    dplyr::mutate(Polarity = sign(as.numeric(stringr::str_sub(.data$ReferenceIon, start = -2))))
+    dplyr::mutate(Polarity = sign(.data$Charge))
+
+  # # get most intense peaks from the set of files we're willing to use
+  # match_pks1 <- jrtools::get_chromatogram_peaks(msa = msa,
+  #                                               ids = unique(area_cor_matches$CID1)) %>%
+  #   dplyr::filter(.data$IsRefPeak == 1) %>%
+  #   # only consider peaks using the reference ion for that feature.
+  #   # reference ion is the one CD used to calculate peak areas.
+  #   dplyr::filter(.data$Area.peak == .data$AreaReferenceIon) %>%
+  #   dplyr::filter(.data$StudyFileID.peak %in% ms_file_order$StudyFileID) %>%
+  #   dplyr::group_by(.data$ConsolidatedUnknownCompoundItemsID) %>%
+  #   dplyr::slice_max(order_by = .data$Area.peak, n = 1) %>%
+  #   dplyr::mutate(Polarity = sign(as.numeric(stringr::str_sub(.data$ReferenceIon, start = -2))))
+  # match_pks2 <- jrtools::get_chromatogram_peaks(msa = msa,
+  #                                               ids = unique(area_cor_matches$CID2)) %>%
+  #   dplyr::filter(.data$IsRefPeak == 1) %>%
+  #   # only consider peaks using the reference ion for that feature.
+  #   # reference ion is the one CD used to calculate peak areas.
+  #   dplyr::filter(.data$Area.peak == .data$AreaReferenceIon) %>%
+  #   dplyr::filter(.data$StudyFileID.peak %in% ms_file_order$StudyFileID) %>%
+  #   dplyr::group_by(.data$ConsolidatedUnknownCompoundItemsID) %>%
+  #   dplyr::slice_max(order_by = .data$Area.peak, n = 1) %>%
+  #   dplyr::mutate(Polarity = sign(as.numeric(stringr::str_sub(.data$ReferenceIon, start = -2))))
 
   match_pks_bounds <- area_cor_matches %>%
     dplyr::left_join(dplyr::select(match_pks1, "ConsolidatedUnknownCompoundItemsID",
@@ -136,13 +214,6 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
 
   ## Load raw mass spec data ----
   message("Loading raw mass spec data...")
-
-  # get list of files in run time order
-  ms_file_order <- msa$input_files %>%
-    # drop extra files, only want ones used for integration
-    dplyr::filter(.data$SampleType %in% c("Sample", "Blank", "Quality Control")) %>%
-    dplyr::mutate(CreationDate = strptime(.data$CreationDate, "%m/%d/%Y %H:%M:%S")) %>%
-    dplyr::arrange(.data$CreationDate)
 
   base_name <- regexec("\\\\([^\\]+)\\.", ms_file_order$PhysicalFileName)
   base_name <- regmatches(ms_file_order$PhysicalFileName, m = base_name)
@@ -171,148 +242,172 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
     MSnbase::pickPeaks(refineMz = "kNeighbors", k = 5, halfWindowSize = 3) #%>%
     # findChromPeaks(param = cwp, BPPARAM = par_params)
 
-  # align retention times across samples
-  ref_idx <- match(paste0(ref_align_file, ".mzML"), base_name)
-  obw_par <- xcms::ObiwarpParam(binSize = 0.4,
-                          subset = 2:5,
-                          centerSample = ref_idx)
-  # make sure these run serially -- parallel processing doesn't work for some
-  # unknown reason
-  # get the registry state
-  bpps <- BiocParallel::registered()
-  # force serial operatioin
-  BiocParallel::register(BPPARAM = BiocParallel::SerialParam(), default = TRUE)
+  # alignment in XCMS is slow, and we've already done it on the instrument software anyway
+  # we can grab the preexisting alignment data and shove it into the XCMS objects
+  # also saves time because we don't have to align pos/neg mode separately
 
-  # have to force alignments into XCMSnExp objects so adjustment works right
-  suppressWarnings({
-  xdata_aln <- xcms::adjustRtime(methods::as(xdata, "XCMSnExp"), param = obw_par)
-  xdata_aln_neg <- xcms::adjustRtime(methods::as(xdata_neg, "XCMSnExp"), param = obw_par)
+  # convert MSnbase experiments to XCMSnExp objects so adjustment works right
+  xdata_aln <- methods::as(xdata, "XCMSnExp")
+  xdata_aln_neg <- methods::as(xdata_neg, "XCMSnExp")
+
+  # grab preexisting alignment data
+  rt_adj <- jrtools::get_file_rt_corrections(msa, file_id = ms_file_order$FileID) %>%
+    # convert time to seconds
+    dplyr::mutate(OriginalRT = 60*.data$OriginalRT,
+                  CorrectedRT = 60*.data$CorrectedRT)
+
+  # grab XCMS scan times -- these don't quite align with raw data
+  xrt <- xcms::rtime(xdata_aln, adjusted = FALSE, bySample = TRUE)
+  xrt_neg <- xcms::rtime(xdata_aln_neg, adjusted = FALSE, bySample = TRUE)
+  names(xrt) <- ms_file_order$StudyFileID
+  names(xrt_neg) <- ms_file_order$StudyFileID
+
+  # interpolate existing alignment to match XCMS scan times
+  cd_rt_adj <- lapply(X = ms_file_order$StudyFileID, function(fid) {
+    # get compound discoverer adjustments for this file
+    file_rt_adj <- dplyr::filter(rt_adj, .data$StudyFileID == fid)
+    # get XCMS scan retention times
+    file_xrt <- xrt[[fid]]
+    # the new alignment method uses a reference file, so it doesn't get adjusted
+    if(nrow(file_rt_adj) == 0) {
+      # return the original retention times unaltered
+      return(file_xrt)
+    } else {
+      # interpolate within CD adjusted RTs
+      file_xrt_adj <- stats::approx(x = file_rt_adj$OriginalRT, y = file_rt_adj$CorrectedRT,
+                             xout = file_xrt, yleft = 0, rule = 1:2)$y
+      # apply scan names
+      names(file_xrt_adj) <- names(file_xrt)
+      return(file_xrt_adj)
+    }
   })
+  # apply adjusted times
+  xcms::adjustedRtime(xdata_aln) <- cd_rt_adj
 
-  # now fix the parallel processing registry
-  for (param in rev(bpps)) {
-    BiocParallel::register(param)
-  }
+  # repeat for negative mode
+  # interpolate existing alignment to match XCMS scan times
+  cd_rt_neg_adj <- lapply(X = ms_file_order$StudyFileID, function(fid) {
+    # get compound discoverer adjustments for this file
+    file_rt_adj <- dplyr::filter(rt_adj, .data$StudyFileID == fid)
+    # get XCMS scan retention times
+    file_xrt <- xrt_neg[[fid]]
+    # the new alignment method uses a reference file, so it doesn't get adjusted
+    if(nrow(file_rt_adj) == 0) {
+      # return the original retention times unaltered
+      return(file_xrt)
+    } else {
+      # interpolate within CD adjusted RTs
+      file_xrt_adj <- stats::approx(x = file_rt_adj$OriginalRT, y = file_rt_adj$CorrectedRT,
+                                    xout = file_xrt, yleft = 0, rule = 1:2)$y
+      # apply scan names
+      names(file_xrt_adj) <- names(file_xrt)
+      return(file_xrt_adj)
+    }
+  })
+  # apply adjusted times
+  xcms::adjustedRtime(xdata_aln_neg) <- cd_rt_neg_adj
+
+  # # align retention times across samples
+  # # we won't use blanks for RT alignment
+  # sub_idx <- which(ms_file_order$SampleType != "Blank")
+  # # reference sample index is within the subset indices
+  # ref_idx <- match(paste0(ref_align_file, ".mzML"), base_name[sub_idx])
+  # obw_par <- xcms::ObiwarpParam(binSize = 0.4,
+  #                         subset = sub_idx,
+  #                         centerSample = ref_idx)
+  # # make sure these run serially -- parallel processing doesn't work for some
+  # # unknown reason
+  # # get the registry state
+  # bpps <- BiocParallel::registered()
+  # # force serial operatioin
+  # BiocParallel::register(BPPARAM = BiocParallel::SerialParam(), default = TRUE)
+  #
+  # # have to force alignments into XCMSnExp objects so adjustment works right
+  # suppressWarnings({
+  # xdata_aln <- xcms::adjustRtime(methods::as(xdata, "XCMSnExp"), param = obw_par)
+  # xdata_aln_neg <- xcms::adjustRtime(methods::as(xdata_neg, "XCMSnExp"), param = obw_par)
+  # })
+  #
+  # # now fix the parallel processing registry
+  # for (param in rev(bpps)) {
+  #   BiocParallel::register(param)
+  # }
 
   ## Calculate XICs ----
   message("Calculating extracted ion chromatograms...")
 
   # for each compound found in 1+ matches, get its RT and mz windows
   match_mz1 <- match_pks_bounds %>%
-    dplyr::group_by(.data$CID1) %>%
-    dplyr::summarise(Polarity.1 = dplyr::first(.data$Polarity.1),
-              Mass.1 = dplyr::first(.data$Mass.1),
-              LeftRT = min(.data$LeftRT)*60,
-              RightRT = max(.data$RightRT)*60,
-              # use file where more intense feature is highest
-              StudyFileID = dplyr::first(.data$StudyFileID)) %>%
-    dplyr::mutate(mzmin.1 = .data$Mass.1 - xic_tol/1e6*.data$Mass.1,
-           mzmax.1 = .data$Mass.1 + xic_tol/1e6*.data$Mass.1)
-  match_mz1_pos <- match_mz1 %>%
-    dplyr::filter(.data$Polarity.1 == 1)
-  match_mz1_neg <- match_mz1 %>%
-    dplyr::filter(.data$Polarity.1 == -1)
-
+    select(CID = "CID1", Polarity = "Polarity.1", Mass = "Mass.1", "LeftRT", "RightRT", "StudyFileID")
   match_mz2 <- match_pks_bounds %>%
-    dplyr::group_by(.data$CID2) %>%
-    dplyr::summarise(Polarity.2 = dplyr::first(.data$Polarity.2),
-                     Mass.2 = dplyr::first(.data$Mass.2),
+    select(CID = "CID2", Polarity = "Polarity.2", Mass = "Mass.2", "LeftRT", "RightRT", "StudyFileID")
+
+  match_mz <- bind_rows(match_mz1, match_mz2) %>%
+    dplyr::group_by(.data$CID) %>%
+    dplyr::summarise(Polarity = dplyr::first(.data$Polarity),
+                     Mass = dplyr::first(.data$Mass),
                      LeftRT = min(.data$LeftRT)*60,
                      RightRT = max(.data$RightRT)*60,
                      # use file where more intense feature is highest
                      StudyFileID = dplyr::first(.data$StudyFileID)) %>%
-    dplyr::mutate(mzmin.2 = .data$Mass.2 - xic_tol/1e6*.data$Mass.2,
-                  mzmax.2 = .data$Mass.2 + xic_tol/1e6*.data$Mass.2)
-  match_mz2_pos <- match_mz2 %>%
-    dplyr::filter(.data$Polarity.2 == 1)
-  match_mz2_neg <- match_mz2 %>%
-    dplyr::filter(.data$Polarity.2 == -1)
+    dplyr::mutate(mzmin = .data$Mass - xic_tol/1e6*.data$Mass,
+                  mzmax = .data$Mass + xic_tol/1e6*.data$Mass)
+
+  match_mz_pos <- match_mz %>%
+    dplyr::filter(.data$Polarity == 1)
+  match_mz_neg <- match_mz %>%
+    dplyr::filter(.data$Polarity == -1)
 
   # for each compound in 1+ matches, get XICs from all alignment files
   # these throw a zillion warnings about zero values, so we suppress those
   suppressMessages({
-  match_xics1_pos <- xcms::chromatogram(xdata_aln,
-                                  mz = as.matrix(dplyr::select(match_mz1_pos, "mzmin.1", "mzmax.1")),
-                                  rt = as.matrix(dplyr::select(match_mz1_pos, "LeftRT", "RightRT")),
-                                  msLevel = 1, BPPARAM = bp_param,
-                                  missing = 0)
-  match_xics1_neg <- xcms::chromatogram(xdata_aln_neg,
-                                  mz = as.matrix(dplyr::select(match_mz1_neg, "mzmin.1", "mzmax.1")),
-                                  rt = as.matrix(dplyr::select(match_mz1_neg, "LeftRT", "RightRT")),
-                                  msLevel = 1, BPPARAM = bp_param,
-                                  missing = 0)
-  match_xics2_pos <- xcms::chromatogram(xdata_aln,
-                                  mz = as.matrix(dplyr::select(match_mz2_pos, "mzmin.2", "mzmax.2")),
-                                  rt = as.matrix(dplyr::select(match_mz2_pos, "LeftRT", "RightRT")),
-                                  msLevel = 1, BPPARAM = bp_param,
-                                  missing = 0)
-  match_xics2_neg <- xcms::chromatogram(xdata_aln_neg,
-                                  mz = as.matrix(dplyr::select(match_mz2_neg, "mzmin.2", "mzmax.2")),
-                                  rt = as.matrix(dplyr::select(match_mz2_neg, "LeftRT", "RightRT")),
-                                  msLevel = 1, BPPARAM = bp_param,
-                                  missing = 0)
+    match_xics_pos <- xcms::chromatogram(xdata_aln,
+                                          mz = as.matrix(dplyr::select(match_mz_pos, "mzmin", "mzmax")),
+                                          rt = as.matrix(dplyr::select(match_mz_pos, "LeftRT", "RightRT")),
+                                          msLevel = 1, BPPARAM = bp_param,
+                                          missing = 0)
+    match_xics_neg <- xcms::chromatogram(xdata_aln_neg,
+                                          mz = as.matrix(dplyr::select(match_mz_neg, "mzmin", "mzmax")),
+                                          rt = as.matrix(dplyr::select(match_mz_neg, "LeftRT", "RightRT")),
+                                          msLevel = 1, BPPARAM = bp_param,
+                                          missing = 0)
   })
 
   # Now pull XICs for each match pair from the file where the more abundant
   # feature is most abundant. This will give us the best peaks for comparing profiles.
 
   # make 2-column matrix of (compound, file) indices
-  xic_file_order <- colnames(match_xics1_pos) %>%
+  xic_file_order <- colnames(match_xics_pos) %>%
     stringr::str_sub(end = -6)
   study_file_key <- msa$input_files %>%
+    # drop extra files, only want ones used for integration
+    dplyr::filter(.data$SampleType %in% c("Sample", "Quality Control")) %>%
     dplyr::select("FileName", "StudyFileID") %>%
     dplyr::mutate(File = stringr::str_match(.data$FileName, "[\\\\/]([^\\\\/]*)\\.raw")[, 2],
-           XIC_Idx = match(.data$File, xic_file_order))
+                  XIC_Idx = match(.data$File, xic_file_order))
 
-  # for each compound, get the index of the file where it is most abundant
-  match_file_idx1_pos <- match_mz1_pos %>%
-    dplyr::left_join(study_file_key, by = "StudyFileID") %>%
-    dplyr::select("XIC_Idx") %>%
-    # same row order in match_mz1_pos and match_xics1_pos
-    dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
-    as.matrix()
-  match_file_idx1_neg <- match_mz1_neg %>%
-    dplyr::left_join(study_file_key, by = "StudyFileID") %>%
-    dplyr::select("XIC_Idx") %>%
-    dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
-    as.matrix()
-  match_file_idx2_pos <- match_mz2_pos %>%
-    dplyr::left_join(study_file_key, by = "StudyFileID") %>%
-    dplyr::select("XIC_Idx") %>%
-    dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
-    as.matrix()
-  match_file_idx2_neg <- match_mz2_neg %>%
-    dplyr::left_join(study_file_key, by = "StudyFileID") %>%
-    dplyr::select("XIC_Idx") %>%
-    dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
-    as.matrix()
-
-  # for each compound, get the XIC from the file where it is most abundant
-  match_xic_sub1_pos <- lapply(X = 1:nrow(match_file_idx1_pos), FUN = function(r) {
-    return(match_xics1_pos[match_file_idx1_pos[r, 1], match_file_idx1_pos[r, 2]])
+  # pull XICs from each file of interest for every CID
+  high_xics <- bind_rows(match_mz1, match_mz2) %>%
+    select(CID, Polarity, StudyFileID) %>%
+    distinct()
+  # high_xics$XIC <- mapply(cid = high_xics$CID, pol = high_xics$Polarity, SIMPLIFY = FALSE, FUN = function(cid, pol) {
+  high_xics$XIC <- lapply(X = 1:nrow(high_xics), FUN = function(r) {
+    cid <- high_xics$CID[[r]]
+    if(high_xics$Polarity[[r]] == 1) {
+      # index of compound (row in XIC object)
+      cid_idx <- match(cid, match_mz_pos$CID)
+      # index of file (column in XIC object)
+      file_idx <- match(high_xics$StudyFileID[[r]], ms_file_order$StudyFileID)
+      xic <- match_xics_pos[cid_idx, file_idx]
+    } else {
+      # index of compound (row in XIC object)
+      cid_idx <- match(cid, match_mz_neg$CID)
+      # index of file (column in XIC object)
+      file_idx <- match(high_xics$StudyFileID[[r]], ms_file_order$StudyFileID)
+      xic <- match_xics_neg[cid_idx, file_idx]
+    }
+    return(xic)
   })
-  match_xic_sub1_neg <- lapply(X = 1:nrow(match_file_idx1_neg), FUN = function(r) {
-    return(match_xics1_neg[match_file_idx1_neg[r, 1], match_file_idx1_neg[r, 2]])
-  })
-  match_xic_sub2_pos <- lapply(X = 1:nrow(match_file_idx2_pos), FUN = function(r) {
-    return(match_xics2_pos[match_file_idx2_pos[r, 1], match_file_idx2_pos[r, 2]])
-  })
-  match_xic_sub2_neg <- lapply(X = 1:nrow(match_file_idx2_neg), FUN = function(r) {
-    return(match_xics2_neg[match_file_idx2_neg[r, 1], match_file_idx2_neg[r, 2]])
-  })
-
-  # compare chromatograms for each putative pair
-  cid_xic1_pos <- tibble::tibble(CID = match_mz1_pos$CID1,
-                         XIC = match_xic_sub1_pos)
-  cid_xic2_pos <- tibble::tibble(CID = match_mz2_pos$CID2,
-                         XIC = match_xic_sub2_pos)
-  cid_xic1_neg <- tibble::tibble(CID = match_mz1_neg$CID1,
-                         XIC = match_xic_sub1_neg)
-  cid_xic2_neg <- tibble::tibble(CID = match_mz2_neg$CID2,
-                         XIC = match_xic_sub2_neg)
-  # bind all XICs for each comparison side into single tibbles
-  cid_xic1 <- dplyr::bind_rows(cid_xic1_neg, cid_xic1_pos)
-  cid_xic2 <- dplyr::bind_rows(cid_xic2_neg, cid_xic2_pos)
 
   ## Calculate Euclidean error norms on scaled XICs ----
   message("Comparing peak shapes...")
@@ -331,8 +426,10 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
 
   xic_cors <- lapply(X = 1:nrow(match_pks_bounds), FUN = function(r) {
     # get the relevant XICs
-    xic1 <- cid_xic1$XIC[[match(match_pks_bounds$CID1[r], cid_xic1$CID)]]
-    xic2 <- cid_xic2$XIC[[match(match_pks_bounds$CID2[r], cid_xic2$CID)]]
+    xic1 <- filter(high_xics, CID == match_pks_bounds$CID1[r],
+                   StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
+    xic2 <- filter(high_xics, CID == match_pks_bounds$CID2[r],
+                   StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
     # filter to only the relevant peak
     xic1 <- MSnbase::filterRt(xic1, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
     xic2 <- MSnbase::filterRt(xic2, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
@@ -340,8 +437,155 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
     #   errorCondition("Non matching XICs!")
     # }
     xc <- MSnbase::compareChromatograms(x = xic1, y = xic2, FUN = scaled_Lp_error_norm,
-                               FUNARGS = list(p = 2))
+                                        FUNARGS = list(p = 2))
   })
+
+
+  # # for each compound found in 1+ matches, get its RT and mz windows
+  # match_mz1 <- match_pks_bounds %>%
+  #   dplyr::group_by(.data$CID1) %>%
+  #   dplyr::summarise(Polarity.1 = dplyr::first(.data$Polarity.1),
+  #             Mass.1 = dplyr::first(.data$Mass.1),
+  #             LeftRT = min(.data$LeftRT)*60,
+  #             RightRT = max(.data$RightRT)*60,
+  #             # use file where more intense feature is highest
+  #             StudyFileID = dplyr::first(.data$StudyFileID)) %>%
+  #   dplyr::mutate(mzmin.1 = .data$Mass.1 - xic_tol/1e6*.data$Mass.1,
+  #          mzmax.1 = .data$Mass.1 + xic_tol/1e6*.data$Mass.1)
+  # match_mz1_pos <- match_mz1 %>%
+  #   dplyr::filter(.data$Polarity.1 == 1)
+  # match_mz1_neg <- match_mz1 %>%
+  #   dplyr::filter(.data$Polarity.1 == -1)
+  #
+  # match_mz2 <- match_pks_bounds %>%
+  #   dplyr::group_by(.data$CID2) %>%
+  #   dplyr::summarise(Polarity.2 = dplyr::first(.data$Polarity.2),
+  #                    Mass.2 = dplyr::first(.data$Mass.2),
+  #                    LeftRT = min(.data$LeftRT)*60,
+  #                    RightRT = max(.data$RightRT)*60,
+  #                    # use file where more intense feature is highest
+  #                    StudyFileID = dplyr::first(.data$StudyFileID)) %>%
+  #   dplyr::mutate(mzmin.2 = .data$Mass.2 - xic_tol/1e6*.data$Mass.2,
+  #                 mzmax.2 = .data$Mass.2 + xic_tol/1e6*.data$Mass.2)
+  # match_mz2_pos <- match_mz2 %>%
+  #   dplyr::filter(.data$Polarity.2 == 1)
+  # match_mz2_neg <- match_mz2 %>%
+  #   dplyr::filter(.data$Polarity.2 == -1)
+  #
+  # # for each compound in 1+ matches, get XICs from all alignment files
+  # # these throw a zillion warnings about zero values, so we suppress those
+  # suppressMessages({
+  # match_xics1_pos <- xcms::chromatogram(xdata_aln,
+  #                                 mz = as.matrix(dplyr::select(match_mz1_pos, "mzmin.1", "mzmax.1")),
+  #                                 rt = as.matrix(dplyr::select(match_mz1_pos, "LeftRT", "RightRT")),
+  #                                 msLevel = 1, BPPARAM = bp_param,
+  #                                 missing = 0)
+  # match_xics1_neg <- xcms::chromatogram(xdata_aln_neg,
+  #                                 mz = as.matrix(dplyr::select(match_mz1_neg, "mzmin.1", "mzmax.1")),
+  #                                 rt = as.matrix(dplyr::select(match_mz1_neg, "LeftRT", "RightRT")),
+  #                                 msLevel = 1, BPPARAM = bp_param,
+  #                                 missing = 0)
+  # match_xics2_pos <- xcms::chromatogram(xdata_aln,
+  #                                 mz = as.matrix(dplyr::select(match_mz2_pos, "mzmin.2", "mzmax.2")),
+  #                                 rt = as.matrix(dplyr::select(match_mz2_pos, "LeftRT", "RightRT")),
+  #                                 msLevel = 1, BPPARAM = bp_param,
+  #                                 missing = 0)
+  # match_xics2_neg <- xcms::chromatogram(xdata_aln_neg,
+  #                                 mz = as.matrix(dplyr::select(match_mz2_neg, "mzmin.2", "mzmax.2")),
+  #                                 rt = as.matrix(dplyr::select(match_mz2_neg, "LeftRT", "RightRT")),
+  #                                 msLevel = 1, BPPARAM = bp_param,
+  #                                 missing = 0)
+  # })
+  #
+  # # Now pull XICs for each match pair from the file where the more abundant
+  # # feature is most abundant. This will give us the best peaks for comparing profiles.
+  #
+  # # make 2-column matrix of (compound, file) indices
+  # xic_file_order <- colnames(match_xics1_pos) %>%
+  #   stringr::str_sub(end = -6)
+  # study_file_key <- msa$input_files %>%
+  #   dplyr::select("FileName", "StudyFileID") %>%
+  #   dplyr::mutate(File = stringr::str_match(.data$FileName, "[\\\\/]([^\\\\/]*)\\.raw")[, 2],
+  #          XIC_Idx = match(.data$File, xic_file_order))
+  #
+  # # for each compound, get the index of the file where it is most abundant
+  # match_file_idx1_pos <- match_mz1_pos %>%
+  #   dplyr::left_join(study_file_key, by = "StudyFileID") %>%
+  #   dplyr::select("XIC_Idx") %>%
+  #   # same row order in match_mz1_pos and match_xics1_pos
+  #   dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
+  #   as.matrix()
+  # match_file_idx1_neg <- match_mz1_neg %>%
+  #   dplyr::left_join(study_file_key, by = "StudyFileID") %>%
+  #   dplyr::select("XIC_Idx") %>%
+  #   dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
+  #   as.matrix()
+  # match_file_idx2_pos <- match_mz2_pos %>%
+  #   dplyr::left_join(study_file_key, by = "StudyFileID") %>%
+  #   dplyr::select("XIC_Idx") %>%
+  #   dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
+  #   as.matrix()
+  # match_file_idx2_neg <- match_mz2_neg %>%
+  #   dplyr::left_join(study_file_key, by = "StudyFileID") %>%
+  #   dplyr::select("XIC_Idx") %>%
+  #   dplyr::mutate(Row = dplyr::row_number(), .before = 1) %>%
+  #   as.matrix()
+  #
+  # # for each compound, get the XIC from the file where it is most abundant
+  # match_xic_sub1_pos <- lapply(X = 1:nrow(match_file_idx1_pos), FUN = function(r) {
+  #   return(match_xics1_pos[match_file_idx1_pos[r, 1], match_file_idx1_pos[r, 2]])
+  # })
+  # match_xic_sub1_neg <- lapply(X = 1:nrow(match_file_idx1_neg), FUN = function(r) {
+  #   return(match_xics1_neg[match_file_idx1_neg[r, 1], match_file_idx1_neg[r, 2]])
+  # })
+  # match_xic_sub2_pos <- lapply(X = 1:nrow(match_file_idx2_pos), FUN = function(r) {
+  #   return(match_xics2_pos[match_file_idx2_pos[r, 1], match_file_idx2_pos[r, 2]])
+  # })
+  # match_xic_sub2_neg <- lapply(X = 1:nrow(match_file_idx2_neg), FUN = function(r) {
+  #   return(match_xics2_neg[match_file_idx2_neg[r, 1], match_file_idx2_neg[r, 2]])
+  # })
+  #
+  # # compare chromatograms for each putative pair
+  # cid_xic1_pos <- tibble::tibble(CID = match_mz1_pos$CID1,
+  #                        XIC = match_xic_sub1_pos)
+  # cid_xic2_pos <- tibble::tibble(CID = match_mz2_pos$CID2,
+  #                        XIC = match_xic_sub2_pos)
+  # cid_xic1_neg <- tibble::tibble(CID = match_mz1_neg$CID1,
+  #                        XIC = match_xic_sub1_neg)
+  # cid_xic2_neg <- tibble::tibble(CID = match_mz2_neg$CID2,
+  #                        XIC = match_xic_sub2_neg)
+  # # bind all XICs for each comparison side into single tibbles
+  # cid_xic1 <- dplyr::bind_rows(cid_xic1_neg, cid_xic1_pos)
+  # cid_xic2 <- dplyr::bind_rows(cid_xic2_neg, cid_xic2_pos)
+  #
+  # ## Calculate Euclidean error norms on scaled XICs ----
+  # message("Comparing peak shapes...")
+  #
+  # # p-norm calculation assumes that both vectors are non-negative!
+  # scaled_Lp_error_norm <- function(v1, v2, p) {
+  #   # NA values should actually be 0
+  #   v1[is.na(v1)] <- 0
+  #   v2[is.na(v2)] <- 0
+  #   # scale both vectors to max == 1
+  #   v1 <- v1/max(v1)
+  #   v2 <- v2/max(v2)
+  #   vd <- sum(abs(v2 - v1)^p)^(1/p)/length(v1)^(1/p)
+  #   return(vd)
+  # }
+  #
+  # xic_cors <- lapply(X = 1:nrow(match_pks_bounds), FUN = function(r) {
+  #   # get the relevant XICs
+  #   xic1 <- cid_xic1$XIC[[match(match_pks_bounds$CID1[r], cid_xic1$CID)]]
+  #   xic2 <- cid_xic2$XIC[[match(match_pks_bounds$CID2[r], cid_xic2$CID)]]
+  #   # filter to only the relevant peak
+  #   xic1 <- MSnbase::filterRt(xic1, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
+  #   xic2 <- MSnbase::filterRt(xic2, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
+  #   # if(sum(rtime(xic2) != rtime(xic1)) > 0) {
+  #   #   errorCondition("Non matching XICs!")
+  #   # }
+  #   xc <- MSnbase::compareChromatograms(x = xic1, y = xic2, FUN = scaled_Lp_error_norm,
+  #                              FUNARGS = list(p = 2))
+  # })
 
   df <- aln_compounds %>%
     dplyr::select(CID = "ID", RT = "RetentionTime")

@@ -51,3 +51,9 @@ approach also finds instances where the alignment software has missed adducts,
 isotopologues, or multiply charged versions of a single compound. It also
 corrects for occasional alignment software errors.
 }
+\details{
+When comparing peak shapes, this algorithm uses XICs from the file where
+either compound is highest. This process only uses files marked as 'Sample' or
+'Quality Control' in the original alignment so that the peak shapes represent
+behavior in real samples.
+}
