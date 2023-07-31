@@ -302,6 +302,44 @@ get_compound_xics <- function(msa, ids = NULL) {
   return(xics)
 }
 
+#' Get best ions associated with compounds
+#'
+#' Queries a mass spec alignment database to get what the software considers to
+#' be the "best representative compound data" for each compound.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get best ions for, or NULL to get all best ions
+#'
+#' @details
+#' The BestHitType column can be 0 (unknown), 1 (best MS1), 2 (best MS2), or
+#' 4 (best deconvoluted MS).
+#'
+#' @return A tibble with the best ion data
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+get_compound_best_ions <- function(msa, ids = NULL) {
+  if(is.null(ids)) {
+    ids <- msa$unknown_compound_items$ID
+  }
+
+  # get table matching CIDs to best hit ions
+  ucids <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsBestHitIonInstanceItems")
+  # get the table of best hit ions
+  all_best_hit_ions <- dplyr::tbl(msa$db_connection, "BestHitIonInstanceItems")
+  # get only the ions associated with the compounds we're interested in
+  best_hit_ions <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+  # merge tables
+  best_hit_ions <- dplyr::left_join(best_hit_ions, all_best_hit_ions,
+                           by = c("BestHitIonInstanceItemsWorkflowID" = "WorkflowID",
+                                  "BestHitIonInstanceItemsID" = "ID"))
+  # get local copy of the data
+  best_hit_ions <- dplyr::collect(best_hit_ions)
+
+  return(best_hit_ions)
+}
+
 #' Extract predicted isotopologue pattern data from an SQLite blob
 #'
 #' Certain mass spec data alignment formats store predicted isotopologue spectra
