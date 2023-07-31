@@ -1,3 +1,43 @@
+#' Get descriptive info for tables and columns in the alignment
+#'
+#' Queries a mass spec alignment database to get annotations for all top-level
+#' data tables and their columns. Also gets level annotations associated with
+#' categorical ("Enum") column types.
+#'
+#' @param msa An ms_alignment object to query
+#'
+#' @return A list of two tibbles, one with the table annotation data and the other
+#'  with the categorical data types info
+#'
+#' @importFrom magrittr %>%
+#' @importFrom rlang .data
+#' @export
+get_data_table_info <- function(msa) {
+  # get table listing all top-level data tables
+  table_info <- dplyr::tbl(msa$db_connection, "DataTypes")
+  # get the table of column metadata
+  column_info <- dplyr::tbl(msa$db_connection, "DataTypesColumns")
+  # fix mixed column to be all strings
+  column_info <- dplyr::mutate(column_info, DefaultValue = as.character(.data$DefaultValue))
+  # combine tables
+  table_info <- dplyr::full_join(table_info, column_info,
+                                 by = "DataTypeID",
+                                 suffix = c(".table", ".column"))
+  table_info <- dplyr::collect(table_info)
+
+  # get table listing all enum types
+  enum_info <- dplyr::tbl(msa$db_connection, "EnumDataTypes")
+  # get table listing all enum type levels
+  enum_level_info <- dplyr::tbl(msa$db_connection, "EnumDataTypeValues")
+  # combine tables
+  enum_info <- dplyr::full_join(enum_info, enum_level_info,
+                                 by = "EnumID",
+                                 suffix = c(".enum", ".values"))
+  enum_info <- dplyr::collect(enum_info)
+
+  return(list(table_info = table_info, enum_info = enum_info))
+}
+
 #' Retrieve predicted elemental compositions
 #'
 #' Queries a mass spec alignment database to get the predicted elemental
