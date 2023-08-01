@@ -133,9 +133,9 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
   match_ions <- jrtools::get_compound_ions(msa = msa, ids = unique(c(area_cor_matches$CID1,
                                                                      area_cor_matches$CID2))) %>%
     # keep only ID columns and the ion description and charge
-    dplyr::select(ConsolidatedUnknownCompoundItemsID, UnknownCompoundInstanceItemsWorkflowID,
-           UnknownCompoundInstanceItemsID, UnknownCompoundIonInstanceItemsWorkflowID,
-           UnknownCompoundIonInstanceItemsID, IonDescription, Charge)
+    dplyr::select("ConsolidatedUnknownCompoundItemsID", "UnknownCompoundInstanceItemsWorkflowID",
+           "UnknownCompoundInstanceItemsID", "UnknownCompoundIonInstanceItemsWorkflowID",
+           "UnknownCompoundIonInstanceItemsID", "IonDescription", "Charge")
 
   # get most intense peaks from the set of files we're willing to use
   match_pks1 <- jrtools::get_chromatogram_peaks(msa = msa,
@@ -338,11 +338,11 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
 
   # for each compound found in 1+ matches, get its RT and mz windows
   match_mz1 <- match_pks_bounds %>%
-    select(CID = "CID1", Polarity = "Polarity.1", Mass = "Mass.1", "LeftRT", "RightRT", "StudyFileID")
+    dplyr::select(CID = "CID1", Polarity = "Polarity.1", Mass = "Mass.1", "LeftRT", "RightRT", "StudyFileID")
   match_mz2 <- match_pks_bounds %>%
-    select(CID = "CID2", Polarity = "Polarity.2", Mass = "Mass.2", "LeftRT", "RightRT", "StudyFileID")
+    dplyr::select(CID = "CID2", Polarity = "Polarity.2", Mass = "Mass.2", "LeftRT", "RightRT", "StudyFileID")
 
-  match_mz <- bind_rows(match_mz1, match_mz2) %>%
+  match_mz <- dplyr::bind_rows(match_mz1, match_mz2) %>%
     dplyr::group_by(.data$CID) %>%
     dplyr::summarise(Polarity = dplyr::first(.data$Polarity),
                      Mass = dplyr::first(.data$Mass),
@@ -387,9 +387,9 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
                   XIC_Idx = match(.data$File, xic_file_order))
 
   # pull XICs from each file of interest for every CID
-  high_xics <- bind_rows(match_mz1, match_mz2) %>%
-    select(CID, Polarity, StudyFileID) %>%
-    distinct()
+  high_xics <- dplyr::bind_rows(match_mz1, match_mz2) %>%
+    dplyr::select("CID", "Polarity", "StudyFileID") %>%
+    dplyr::distinct()
   # high_xics$XIC <- mapply(cid = high_xics$CID, pol = high_xics$Polarity, SIMPLIFY = FALSE, FUN = function(cid, pol) {
   high_xics$XIC <- lapply(X = 1:nrow(high_xics), FUN = function(r) {
     cid <- high_xics$CID[[r]]
@@ -426,10 +426,10 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
 
   xic_cors <- lapply(X = 1:nrow(match_pks_bounds), FUN = function(r) {
     # get the relevant XICs
-    xic1 <- filter(high_xics, CID == match_pks_bounds$CID1[r],
-                   StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
-    xic2 <- filter(high_xics, CID == match_pks_bounds$CID2[r],
-                   StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
+    xic1 <- dplyr::filter(high_xics, .data$CID == match_pks_bounds$CID1[r],
+                          .data$StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
+    xic2 <- dplyr::filter(high_xics, .data$CID == match_pks_bounds$CID2[r],
+                          .data$StudyFileID == match_pks_bounds$StudyFileID[r])$XIC[[1]]
     # filter to only the relevant peak
     xic1 <- MSnbase::filterRt(xic1, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
     xic2 <- MSnbase::filterRt(xic2, rt = c(match_pks_bounds$LeftRT[r]*60, match_pks_bounds$RightRT[r]*60))
