@@ -7,8 +7,6 @@
 #'
 #' @return A list containing the alignment data tables.
 #'
-#' @importFrom magrittr %>%
-#' @importFrom rlang .data
 #' @export
 import_ms_alignment <- function(f) {
   # TODO: rework to only import table data and main unknown compound table?

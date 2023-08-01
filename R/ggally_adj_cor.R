@@ -33,7 +33,6 @@ is_date <- function(x) {
 #' @param alignPercent,displayGrid deprecated. Please use their snake-case counterparts.
 #' @param title title text to be displayed
 #' @author Barret Schloerke
-#' @importFrom stats complete.cases cor
 #' @seealso \code{\link[GGally]{ggally_statistic}}, \code{\link[GGally]{ggally_cor_v1_5}}, \code{\link[GGally]{ggally_cor}}
 #' @export
 #' @keywords hplot

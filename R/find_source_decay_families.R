@@ -31,7 +31,7 @@
 #'    \code{sdf_cluster_centers} \tab Compound IDs of the central member of each compound cluster. \cr
 #'    \tab \cr
 #'}
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @export
 find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
@@ -86,7 +86,7 @@ find_source_decay_families <- function(msa, raw_data_folder, ref_align_file,
     # this also pulls ua into the local environment, so it'll get passed to workers
     ua <- dplyr::mutate(unique_areas, dplyr::across(-.data$StudyFileID, log10))
     f <- function(idx1, idx2) {
-      return(cor(x = ua[, idx1], y = ua[, idx2]))
+      return(stats::cor(x = ua[, idx1], y = ua[, idx2]))
     }
     return(f)
   }

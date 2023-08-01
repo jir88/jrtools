@@ -12,7 +12,6 @@
 #'
 #' @return A tibble containing the mass spectrum.
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 extract_spectral_blob <- function(blb, zip_dir = tempdir()) {

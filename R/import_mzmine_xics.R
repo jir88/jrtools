@@ -7,7 +7,8 @@
 #'
 #' @return A tibble of all the XIC data
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 import_mzmine_xics <- function(file) {
   # XIC headers appear in first row, every other column *facepalm*
@@ -30,7 +31,7 @@ import_mzmine_xics <- function(file) {
   hdrs <- dplyr::mutate(hdrs, value = rep(hdrs$value[idx], times = runs))
   # extract data from headers
   # peak XICs have m/z data embedded in header, but full XICs don't
-  hdrs <- tidyr::extract(hdrs, col = value, into = c(NA, "mz", "File"),
+  hdrs <- tidyr::extract(hdrs, col = "value", into = c(NA, "mz", "File"),
                          convert = TRUE, regex = "(m\\/z ([0-9.]+).+: )?(.+)")
 
   # grab the data column headers and make unique
@@ -47,20 +48,20 @@ import_mzmine_xics <- function(file) {
   tidy_xics <- raw_xics %>%
     # select(-starts_with("z-axis")) %>%
     dplyr::mutate(Index = dplyr::row_number()) %>%
-    tidyr::pivot_longer(cols = -Index) %>%
+    tidyr::pivot_longer(cols = -"Index") %>%
     tidyr::extract(col = "name", into = c("name", "hdr_idx"),
                    regex = "(.+)(\\.{3}\\d+)", convert = TRUE) %>%
     dplyr::left_join(y = hdrs, by = c("hdr_idx" = "name")) %>%
     # left_join(y = sample_key, by = "File") %>%
-    dplyr::select(-hdr_idx) %>%
-    tidyr::drop_na(value) %>%
+    dplyr::select(-"hdr_idx") %>%
+    tidyr::drop_na("value") %>%
     tidyr::pivot_wider(names_from = "name", values_from = "value") %>%
     # z-axis is actually the current m/z, so move that over
     # also anything without a z-axis is a called peak
-    dplyr::mutate(mz = dplyr::if_else(is.na(mz), `z-axis`, as.numeric(mz)),
-           Called_Peak = is.na(`z-axis`)) %>%
-    dplyr::select(-`z-axis`) %>%
-    dplyr::rename(RT = `Retention time`, Intensity = `Base peak intensity`)
+    dplyr::mutate(mz = dplyr::if_else(is.na(.data$mz), .data$`z-axis`, as.numeric(.data$mz)),
+           Called_Peak = is.na(.data$`z-axis`)) %>%
+    dplyr::select(-"z-axis") %>%
+    dplyr::rename(RT = "Retention time", Intensity = "Base peak intensity")
 
   return(tidy_xics)
 }

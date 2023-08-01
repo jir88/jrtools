@@ -7,22 +7,32 @@
 #'   desired before displaying it
 #' @details There isn't really any error-checking here. Put garbage in, you'll
 #'   get garbage out.
+#'
+#' @importFrom rlang .data
 #' @export
 fancy_roc_plot <- function(data) {
-  return(
-    ggplot(data = data$curves, mapping = aes(x = (100 - specificity), y = sensitivity)) +
-      geom_ribbon(mapping = aes(x = (100 - specificity),
-                                ymin = `cisens2.5`, ymax = `cisens97.5`),
-                  fill = "grey80") +
-      geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
-      geom_path(color = "black", size = 1.0) +
-      geom_rangeframe() +
-      labs(x = "false-positive rate (%)", y = "true-positive rate (%)") +
-      annotate(geom = "text", x = 70, y = 40,
-               label = sprintf(fmt = "%1.1f%%\n(%1.1f%% - %1.1f%%)",
-                               data$auc, data$ci[1], data$ci[3]),
-               hjust = "center", size = 6)
-  )
+  gp <- ggplot2::ggplot(data = data$curves,
+                        mapping = ggplot2::aes(x = (100 - .data$specificity),
+                                               y = .data$sensitivity)) +
+    ggplot2::geom_ribbon(mapping = ggplot2::aes(x = (100 - .data$specificity),
+                                                ymin = .data$`cisens2.5`,
+                                                ymax = .data$`cisens97.5`),
+                         fill = "grey80") +
+    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+    ggplot2::geom_path(color = "black", size = 1.0) +
+    ggplot2::labs(x = "false-positive rate (%)", y = "true-positive rate (%)") +
+    ggplot2::annotate(geom = "text", x = 70, y = 40,
+                      label = sprintf(fmt = "%1.1f%%\n(%1.1f%% - %1.1f%%)",
+                                      data$auc, data$ci[1], data$ci[3]),
+                      hjust = "center", size = 6)
+
+  # if ggthemes is available, add a rangeframe
+  if(requireNamespace("ggthemes", quietly = TRUE)) {
+    gp <- gp +
+      ggthemes::geom_rangeframe(color = "black")
+  }
+
+  return(gp)
 }
 
 #' Generate plotmath-formatted scientific notation expressions
@@ -61,6 +71,8 @@ fancy_scientific <- function(l) {
 #'   desired before displaying it
 #' @details There isn't really any error-checking here. Put garbage in, you'll
 #'   get garbage out.
+#'
+#' @importFrom rlang .data
 #' @export
 lollipop_plot <- function(labels, values) {
   #TODO: allow switching axes
@@ -68,10 +80,10 @@ lollipop_plot <- function(labels, values) {
 
   df <- tibble::tibble(Label = labels, Value = values)
 
-  gp <- ggplot2::ggplot(df, ggplot2::aes(x = Value, y = Label)) +
-    ggplot2::geom_hline(ggplot2::aes(yintercept = Label), color = "darkgrey", linetype = "dashed") +
+  gp <- ggplot2::ggplot(df, ggplot2::aes(x = .data$Value, y = .data$Label)) +
+    ggplot2::geom_hline(ggplot2::aes(yintercept = .data$Label), color = "darkgrey", linetype = "dashed") +
     ggplot2::geom_vline(xintercept = 0, color = "darkgrey") +
-    ggplot2::geom_segment(ggplot2::aes(xend = 0, yend = Label)) +
+    ggplot2::geom_segment(ggplot2::aes(xend = 0, yend = .data$Label)) +
     ggplot2::geom_point()
 
   # if ggthemes is available, add a rangeframe

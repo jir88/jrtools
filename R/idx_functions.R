@@ -11,7 +11,8 @@
 #'   Molecular Weight, and RT columns from the Compounds table and ONLY the Fill
 #'   Status and Study File ID columns from the Filled Gaps table. Then open the
 #'   XLSX file in Excel and save it as a CSV file.
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 tidy_gap_fill_methods <- function(method_data_file) {
   fill_data <- readr::read_csv(method_data_file);
@@ -21,17 +22,17 @@ tidy_gap_fill_methods <- function(method_data_file) {
   # generate feature names
   feature_names <- fill_data %>%
     dplyr::slice(feature_rows) %>%
-    dplyr::mutate(Name = dplyr::if_else(is.na(Name),
-                                        paste0(`Molecular Weight`, "@", `RT [min]`),
-                                        as.character(Name)))
+    dplyr::mutate(Name = dplyr::if_else(is.na(.data$Name),
+                                        paste0(.data$`Molecular Weight`, "@", .data$`RT [min]`),
+                                        as.character(.data$Name)))
   # fill them in the original data structure
   fill_data <- fill_data %>%
     dplyr::mutate(Name = rep(feature_names$Name,
-                      times = diff(append(feature_rows, nrow(fill_data) + 1)))) %>%
+                             times = diff(append(feature_rows, nrow(fill_data) + 1)))) %>%
     # remove original 'headers'
     dplyr::slice(-feature_rows, -(feature_rows + 1)) %>%
     # rename columns
-    dplyr::rename(Fill_Method = `Molecular Weight`, `Study File ID` = `RT [min]`)
+    dplyr::rename(Fill_Method = .data$`Molecular Weight`, `Study File ID` = .data$`RT [min]`)
 
   return(fill_data)
 }
@@ -47,7 +48,7 @@ tidy_gap_fill_methods <- function(method_data_file) {
 #' @details Compound Discoverer abuses Excel's row grouping feature to export
 #'   information on mzCloud database hits. This method cleans it up into a
 #'   format R can use.
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @export
 tidy_mzCloud_hits <- function(mzcloud_data) {
   # check file version -- changed between Compound Discoverer v3.0 and 3.3
@@ -69,8 +70,8 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
     mzcloud_features <- mzcloud_data %>%
       dplyr::slice(feature_idx) %>%
       # generate feature IDs
-      dplyr::mutate(Feature_ID = paste0(as.numeric(`Molecular Weight`), "@",
-                                        as.numeric(`RT [min]`)))
+      dplyr::mutate(Feature_ID = paste0(as.numeric(.data$`Molecular Weight`), "@",
+                                        as.numeric(.data$`RT [min]`)))
   } else {
     # actual feature rows always list reference ion
     feature_idx <- which(!is.na(mzcloud_data$`Reference Ion`))
@@ -78,8 +79,8 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
     mzcloud_features <- mzcloud_data %>%
       dplyr::slice(feature_idx) %>%
       # generate feature IDs
-      dplyr::mutate(Feature_ID = paste0(as.numeric(`Calc. MW`), "@",
-                                        as.numeric(`RT [min]`)))
+      dplyr::mutate(Feature_ID = paste0(as.numeric(.data$`Calc. MW`), "@",
+                                        as.numeric(.data$`RT [min]`)))
   }
 
   # pull out column names for the mzCloud hit tables
@@ -130,24 +131,24 @@ tidy_mzCloud_hits <- function(mzcloud_data) {
 #' Versions of Compound Discoverer <3.3 don't include raw m/z values or polarity
 #' in the exported data, so this method will not work for older datasets.
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @export
 save_target_feature_table <- function(raw_data, file, rt_range = 0.5,
                                       mode = c("both", "positive", "negative")) {
   # check mode option
   mode = match.arg(mode)
 
-  full_table <- dplyr::select(raw_data, Name, Mass = `Calc. MW`, RT = `RT [min]`,
-                              `m/z`, Ref_Ion = `Reference Ion`) %>%
+  full_table <- dplyr::select(raw_data, "Name", Mass = "Calc. MW", RT = "RT [min]",
+                              "m/z", Ref_Ion = "Reference Ion") %>%
     # pull charge and sign
-    tidyr::extract(col = Ref_Ion, into = c("Mode", "z"), regex = "([+-])(\\d)$",
+    tidyr::extract(col = "Ref_Ion", into = c("Mode", "z"), regex = "([+-])(\\d)$",
             remove = FALSE, convert = TRUE) %>%
-    dplyr::mutate(Mode = factor(Mode, levels = c("+", "-"),
+    dplyr::mutate(Mode = factor(.data$Mode, levels = c("+", "-"),
                          labels = c("positive", "negative"))) %>%
     # add RT ranges
-    dplyr::mutate(`t start (min)` = RT - rt_range, `t stop (min)` = RT + rt_range) %>%
+    dplyr::mutate(`t start (min)` = .data$RT - rt_range, `t stop (min)` = .data$RT + rt_range) %>%
     # change to export format
-    dplyr::select(Mode, `m/z`, z, `t start (min)`, `t stop (min)`, Name)
+    dplyr::select("Mode", "m/z", "z", "t start (min)", "t stop (min)", "Name")
 
   # create output list
   output <- list()
@@ -157,8 +158,8 @@ save_target_feature_table <- function(raw_data, file, rt_range = 0.5,
     file_name <- paste0(file, "_positive.tsv")
     # pull positive ions
     df <- full_table %>%
-      dplyr::filter(Mode == "positive") %>%
-      dplyr::select(-Mode)
+      dplyr::filter(.data$Mode == "positive") %>%
+      dplyr::select(-"Mode")
     readr::write_tsv(df, file = file_name, na = "")
     output[["positive"]] <- df
   }
@@ -166,8 +167,8 @@ save_target_feature_table <- function(raw_data, file, rt_range = 0.5,
     file_name <- paste0(file, "_negative.tsv")
     # pull positive ions
     df <- full_table %>%
-      dplyr::filter(Mode == "negative") %>%
-      dplyr::select(-Mode)
+      dplyr::filter(.data$Mode == "negative") %>%
+      dplyr::select(-"Mode")
     readr::write_tsv(df, file = file_name, na = "")
     output[["negative"]] <- df
   }
@@ -186,7 +187,6 @@ save_target_feature_table <- function(raw_data, file, rt_range = 0.5,
 #' @return A list containing precursor m/z values, retention times, scan indices,
 #' scan modes, raw header data, and spectra for each entry in the MSP file.
 #'
-#' @importFrom magrittr %>%
 #' @export
 read_msp <- function(path) {
   # open file
@@ -278,7 +278,8 @@ read_msp <- function(path) {
 #' @return A tibble containing all features in the MSP file that match one of
 #' the query features.
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 match_msp <- function(msp_data, mz, rt, max_ppm_diff = 25, max_rt_diff = 0.1) {
   # find close masses (within 25 ppm)
@@ -289,16 +290,16 @@ match_msp <- function(msp_data, mz, rt, max_ppm_diff = 25, max_rt_diff = 0.1) {
 
   feature_comparison <- tibble::as_tibble(delta_mass, rownames = "Query_Features",
                                   .name_repair = "minimal") %>%
-    tidyr::pivot_longer(cols = -Query_Features, names_to = "MSP_Features", values_to = "ppm") %>%
-    dplyr::filter(abs(ppm) < max_ppm_diff) %>%
+    tidyr::pivot_longer(cols = -"Query_Features", names_to = "MSP_Features", values_to = "ppm") %>%
+    dplyr::filter(abs(.data$ppm) < max_ppm_diff) %>%
     dplyr::left_join(y = tibble::tibble(MSP_Features = stringr::str_c(msp_data$mz, "@", msp_data$rt),
                                 MSP_RT = msp_data$rt, MSP_mz = msp_data$mz,
                                 MSP_Index = seq.int(along.with = msp_data$mz)),
                      by = c("MSP_Features")) %>%
-    dplyr::mutate(Query_RT = rt[match(Query_Features, rownames(delta_mass))],
-                  Query_mz = mz[match(Query_Features, rownames(delta_mass))]) %>%
-    dplyr::mutate(dRT = Query_RT - MSP_RT) %>%
-    dplyr::filter(abs(dRT) < max_rt_diff)
+    dplyr::mutate(Query_RT = rt[match(.data$Query_Features, rownames(delta_mass))],
+                  Query_mz = mz[match(.data$Query_Features, rownames(delta_mass))]) %>%
+    dplyr::mutate(dRT = .data$Query_RT - .data$MSP_RT) %>%
+    dplyr::filter(abs(.data$dRT) < max_rt_diff)
   return(feature_comparison)
 }
 
@@ -323,7 +324,7 @@ match_msp <- function(msp_data, mz, rt, max_ppm_diff = 25, max_rt_diff = 0.1) {
 #' @return A tibble containing data on all scans in the MS2 files that match any
 #' of the query features.
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @export
 match_ms2_data <- function(msn_data, mz, rt, mode, max_ppm_diff = 25, max_rt_diff = 0.1) {
   # grab precursor m/z values for every MS2 scan
@@ -353,13 +354,13 @@ match_ms2_data <- function(msn_data, mz, rt, mode, max_ppm_diff = 25, max_rt_dif
 
   feature_comparison <- tibble::as_tibble(delta_mass, rownames = "Query_Features",
                                           .name_repair = "minimal") %>%
-    tidyr::pivot_longer(cols = -Query_Features, names_to = "MS2_Features", values_to = "ppm") %>%
-    dplyr::filter(abs(ppm) < max_ppm_diff) %>%
+    tidyr::pivot_longer(cols = -"Query_Features", names_to = "MS2_Features", values_to = "ppm") %>%
+    dplyr::filter(abs(.data$ppm) < max_ppm_diff) %>%
     dplyr::left_join(y = df, by = c("MS2_Features")) %>%
-    dplyr::mutate(Query_RT = rt[match(Query_Features, rownames(delta_mass))],
-                  Query_mz = mz[match(Query_Features, rownames(delta_mass))]) %>%
-    dplyr::mutate(dRT = Query_RT - MS2_RT) %>%
-    dplyr::filter(abs(dRT) < max_rt_diff)
+    dplyr::mutate(Query_RT = rt[match(.data$Query_Features, rownames(delta_mass))],
+                  Query_mz = mz[match(.data$Query_Features, rownames(delta_mass))]) %>%
+    dplyr::mutate(dRT = .data$Query_RT -.data$ MS2_RT) %>%
+    dplyr::filter(abs(.data$dRT) < max_rt_diff)
 
   return(feature_comparison)
 }
@@ -376,13 +377,12 @@ match_ms2_data <- function(msn_data, mz, rt, mode, max_ppm_diff = 25, max_rt_dif
 #'
 #' @return The input spectrum, invisibly
 #'
-#' @importFrom magrittr %>%
 #' @export
 export_idx_spectrum <- function(spectrum, file) {
   # assemble stuff to write before writing it, so we don't leave files open
 
   # construct scan description string
-  if(polarity(spectrum) == 1) {
+  if(MSnbase::polarity(spectrum) == 1) {
     scan_polarity <- "+"
   } else {
     scan_polarity <- "-"
