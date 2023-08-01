@@ -17,7 +17,7 @@
 #'
 #' @return A tibble of feature matches
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @export
 match_ms_features <- function(mz1, rt1, mz2, rt2, ppm_range = c(-5, 5),

@@ -6,7 +6,8 @@
 #' @param ms_data a MSnExp object containing one or more samples
 #' @param mz_binwidth the m/z bin width (in Da) to use when generating the plot
 #' @return list of ggplot objects, one per sample
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 plot_spectrum_2d <- function(ms_data, mz_binwidth = 1) {
   n_files <- length(MSnbase::fileNames(ms_data))
@@ -29,16 +30,16 @@ plot_spectrum_2d <- function(ms_data, mz_binwidth = 1) {
     # grab scan retention times and calculate scan lengths so they display right
     all_rt <- MSnbase::rtime(ms_file) %>%
       tibble::enframe(name = "Scan", value = "rt") %>%
-      dplyr::mutate(rt_width = c(diff(rt), NA))
+      dplyr::mutate(rt_width = c(diff(.data$rt), NA))
     # fix last rt bin width
     all_rt$rt_width[length(all_rt$rt_width)] <- all_rt$rt_width[length(all_rt$rt_width) - 1]
 
     # extract intensities and add m/z and retention times
     all_intensity <- MSnbase::intensity(ms_file) %>% tibble::as_tibble() %>%
       dplyr::mutate(mz = binned_mz) %>%
-      tidyr::pivot_longer(cols = -mz, names_to = "Scan", values_to = "intensity") %>%
+      tidyr::pivot_longer(cols = -"mz", names_to = "Scan", values_to = "intensity") %>%
       # drop zero intensities
-      dplyr::filter(intensity > 0) %>%
+      dplyr::filter(.data$intensity > 0) %>%
       # add retention times
       dplyr::left_join(all_rt, by = "Scan")
     int_data[[i]] <- all_intensity
@@ -54,9 +55,9 @@ plot_spectrum_2d <- function(ms_data, mz_binwidth = 1) {
   for(i in 1:n_files) {
     # add plot to list
     plot_list[[i]] <- ggplot2::ggplot(int_data[[i]],
-                                      ggplot2::aes(x = rt, y = mz,
-                                                   width = rt_width,
-                                                   fill = log10(intensity + 1))) +
+                                      ggplot2::aes(x = .data$rt, y = .data$mz,
+                                                   width = .data$rt_width,
+                                                   fill = log10(.data$intensity + 1))) +
       ggplot2::geom_tile() +
       ggplot2::scale_y_continuous(limits = mz_range) +
       ggplot2::scale_fill_viridis_c(option = "magma", direction = -1, limits = log10(int_range + 1))

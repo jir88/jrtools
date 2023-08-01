@@ -9,7 +9,6 @@
 #' @return A list of two tibbles, one with the table annotation data and the other
 #'  with the categorical data types info
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_data_table_info <- function(msa) {
@@ -48,7 +47,6 @@ get_data_table_info <- function(msa) {
 #'
 #' @return A tibble with the predicted composition data
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_elemental_compositions <- function(msa, ids = NULL) {
@@ -88,7 +86,6 @@ get_elemental_compositions <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the ion data
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_compound_ions <- function(msa, ids = NULL) {
@@ -136,7 +133,6 @@ get_compound_ions <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the chromatographic peaks
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_chromatogram_peaks <- function(msa, ids = NULL) {
@@ -216,7 +212,6 @@ get_chromatogram_peaks <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the spectra
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_compound_spectra <- function(msa, ids = NULL) {
@@ -266,7 +261,6 @@ get_compound_spectra <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the cloud library matches
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_spectral_cloud_matches <- function(msa, ids = NULL) {
@@ -308,7 +302,6 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the XIC data
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_compound_xics <- function(msa, ids = NULL) {
@@ -364,7 +357,6 @@ get_compound_xics <- function(msa, ids = NULL) {
 #'
 #' @return A tibble with the best ion data
 #'
-#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #' @export
 get_compound_best_ions <- function(msa, ids = NULL) {
@@ -399,7 +391,7 @@ get_compound_best_ions <- function(msa, ids = NULL) {
 #'
 #' @return A tibble containing the isotopologue pattern
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @export
 extract_isotope_pattern_blob <- function(blb, zip_dir = tempdir()) {
@@ -568,14 +560,14 @@ extract_rt_raster_trace <- function(msa, file_id = NULL) {
     chunk3_end <- chunk2_end + 2 + 4*chunk_len
     chunk3 <- readBin(trace_data[(chunk2_end + 1):(chunk3_end)],
                       what = "integer", n = chunk_len, size = 4)
-    return(tibble(Chunk1 = scan_index,
+    return(dplyr::tibble(Chunk1 = scan_index,
                   Chunk2 = chunk2,
                   Chunk3 = chunk3))
   })
   names(traces) <- rt_raster_tbl$ID
-  traces <- bind_rows(traces, .id = "ID")
-  traces <- mutate(traces, ID = as.numeric(ID))
-  df <- full_join(select(rt_raster_tbl, -Trace), traces, by = "ID")
+  traces <- dplyr::bind_rows(traces, .id = "ID")
+  traces <- dplyr::mutate(traces, ID = as.numeric(.data$ID))
+  df <- dplyr::full_join(dplyr::select(rt_raster_tbl, -"Trace"), traces, by = "ID")
 
   return(df)
 }

@@ -8,7 +8,7 @@
 #'
 #' @return A list containing the library data tables.
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @export
 import_spectral_library <- function(f) {

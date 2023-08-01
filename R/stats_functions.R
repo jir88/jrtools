@@ -40,7 +40,8 @@ calc_roc <- function(ctrl_group, case_group) {
 #' @param cases a vector of values taken by the case samples
 #' @param controls a vector of values taken by the control samples
 #' @return The optimal threshold value.
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 pick_roc_threshold <- function(cases, controls) {
   if(!requireNamespace("pROC", quietly = TRUE)) {
@@ -54,16 +55,15 @@ pick_roc_threshold <- function(cases, controls) {
   df <- tibble::tibble(threshold = hs_roc$thresholds,
                        sensitivity = hs_roc$sensitivities,
                        specificity = hs_roc$specificities) %>%
-    dplyr::mutate(sum = sensitivity + specificity) %>%
-    dplyr::filter(is.finite(threshold))
+    dplyr::mutate(sum = .data$sensitivity + .data$specificity) %>%
+    dplyr::filter(is.finite(.data$threshold))
 
   # we pick the 'best' threshold, erring on the side of sensitivity if there are ties
   hs_thresh <- df %>%
-    dplyr::top_n(n = 1, sum) %>%
-    dplyr::top_n(n = 1, sensitivity) %>%
-    .$threshold
+    dplyr::top_n(n = 1, .data$sum) %>%
+    dplyr::top_n(n = 1, .data$sensitivity)
 
-  return(hs_thresh)
+  return(hs_thresh$threshold)
 }
 
 #' Multinomial Deviance Function Stolen from Glmnet
@@ -107,7 +107,7 @@ multinomial_deviance <- function(mdl, x, y) {
 
   # use trained model to predict samples
   # row per sample, col per category, for each lambda value
-  preds = predict(object = mdl, newx = x, s = lambda, type = "response")
+  preds = stats::predict(object = mdl, newx = x, s = lambda, type = "response")
 
   # make sure the predictions have a compatible number of lambda values
   nlami = min(dim(preds)[3], nlambda)
@@ -333,7 +333,8 @@ misclassification_error <- function (mdl, x, y)
 #' @seealso [glmnet::cv.glmnet()] for the original function on which this one
 #'   was based.
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
+#' @importFrom rlang .data
 #' @export
 multi.cv.glmnet <- function(x, y, family = "binomial", eta = 0, nfolds = 10,
                             nreps = 10) {
@@ -383,23 +384,20 @@ multi.cv.glmnet <- function(x, y, family = "binomial", eta = 0, nfolds = 10,
   cv_sds <- apply(cv_deviances, MARGIN = 2, FUN = stats::sd, na.rm = TRUE)
 
   cv_lasso_results <- tibble::tibble(Lambda = lambda_seq, Mean = cv_means, SD = cv_sds) %>%
-    dplyr::mutate(SEM = SD/sqrt(length(cv_folds))) %>%
-    dplyr::mutate(Upper = Mean + SEM, Lower = Mean - SEM)
+    dplyr::mutate(SEM = .data$SD/sqrt(length(cv_folds))) %>%
+    dplyr::mutate(Upper = .data$Mean + .data$SEM, Lower = .data$Mean - .data$SEM)
 
   # which lambda value gives the lowest average deviance on hold-out sets?
-  lambda_min <- cv_lasso_results %>%
-    dplyr::slice_min(order_by = Mean, n = 1, with_ties = FALSE) %>%
-    .$Lambda
+  min_avg_dev <- dplyr::slice_min(cv_lasso_results, order_by = "Mean", n = 1, with_ties = FALSE)
+  lambda_min <- min_avg_dev$Lambda
 
   # which lambda value gives the simplest model within 1-SEM of the minimum?
-  dev_thresh <- cv_lasso_results %>%
-    dplyr::slice_min(order_by = Mean, n = 1, with_ties = FALSE) %>%
-    .$Upper
+  dev_thresh <- min_avg_dev$Upper
   lambda_1se <- cv_lasso_results %>%
-    dplyr::filter(Lambda >= lambda_min) %>%
-    dplyr::filter(Mean <= dev_thresh) %>%
-    dplyr::slice_max(order_by = Mean, n = 1, with_ties = FALSE) %>%
-    .$Lambda
+    dplyr::filter(.data$Lambda >= lambda_min) %>%
+    dplyr::filter(.data$Mean <= dev_thresh) %>%
+    dplyr::slice_max(order_by = "Mean", n = 1, with_ties = FALSE)
+  lambda_1se <- lambda_1se$Lambda
 
   output <- list(full_fit = init_fit, lambda_min = lambda_min,
                  lambda_1se = lambda_1se, cv_folds = cv_folds,
@@ -428,8 +426,9 @@ multi.cv.glmnet <- function(x, y, family = "binomial", eta = 0, nfolds = 10,
 #' @return a tibble containing every non-zero feature coefficient from every
 #'   cross-validation model
 #'
-#' @importFrom magrittr %>%
+#' @importFrom dplyr %>%
 #' @importFrom foreach %dopar%
+#' @importFrom rlang .data
 #' @export
 coef.multi.cv.glmnet <- function(object, s = "lambda.1se", exact = FALSE, ...) {
   # check object class
@@ -460,8 +459,8 @@ coef.multi.cv.glmnet <- function(object, s = "lambda.1se", exact = FALSE, ...) {
       tibble::as_tibble() %>%
       tidyr::pivot_longer(cols = dplyr::everything(), names_to = "Feature",
                    values_to = "Coefficient") %>%
-      dplyr::filter(Coefficient != 0) %>%
-      dplyr::filter(Feature != "(Intercept)")
+      dplyr::filter(.data$Coefficient != 0) %>%
+      dplyr::filter(.data$Feature != "(Intercept)")
 
     return(cv_coefficients)
   } else {
@@ -475,7 +474,7 @@ coef.multi.cv.glmnet <- function(object, s = "lambda.1se", exact = FALSE, ...) {
       rn <- rownames(df[[1]])
 
       # convert coefficients to a wide matrix
-      df <- t(as.matrix(as_tibble(df)))
+      df <- t(as.matrix(tibble::as_tibble(df)))
       # put in the feature names
       colnames(df) <- rn
       # return the matrix
@@ -485,11 +484,13 @@ coef.multi.cv.glmnet <- function(object, s = "lambda.1se", exact = FALSE, ...) {
     # summarize the results
     cv_coefficients <- cv_fits %>%
       tibble::as_tibble(rownames = "Level") %>%
-      tidyr::pivot_longer(cols = -Level, names_to = "Feature",
+      tidyr::pivot_longer(cols = -"Level", names_to = "Feature",
                           values_to = "Coefficient") %>%
-      dplyr::filter(Coefficient != 0) %>%
-      dplyr::filter(Feature != "(Intercept)")
+      dplyr::filter(.data$Coefficient != 0) %>%
+      dplyr::filter(.data$Feature != "(Intercept)")
 
     return(cv_coefficients)
   }
 }
+
+if(getRversion() >= "2.15.1")  utils::globalVariables(c("fit"))
