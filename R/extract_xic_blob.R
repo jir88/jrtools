@@ -5,10 +5,9 @@
 #' This function extracts the stored data from such blobs.
 #'
 #' The precise format of the binary file has not yet been completely elucidated.
-#' Chunk 1 is unknown. Chunk 2 is the retention time in minutes. Chunk 3
-#' is obviously the XIC itself. Chunk 4 looks like probably the instantaneous
-#' noise level, but might be something else. Subtracting chunk 4 from chunk 3
-#' seems to yield reasonable looking XIC traces.
+#' Chunk 1 is unknown, but directly related to retention time. Chunk 2 is the
+#' retention time in minutes. Chunk 3 is the XIC itself. Chunk 4 looks like
+#' probably the instantaneous noise level, but might be something else.
 #'
 #'
 #' @param blb A raw vector containing an SQLite blob of XIC data
@@ -42,30 +41,31 @@ extract_xic_blob <- function(blb) {
   # Not clear whether the gaps between chunks are constant or forcing positions
   # to some multiple of some value or something else
   # Limited testing suggests constant gaps for some weird reason
-  # chunk2 is definitely time in minutes
+
+  # chunk1 is some odd measure of time
   start_chunk1 <- 21
   end_chunk1 <- start_chunk1 + seg_len*dsize - 1
   chunk1 <- readBin(df[start_chunk1:end_chunk1], "integer",
                     n = seg_len, size = dsize)
 
+  # chunk2 is definitely time in minutes
   start_chunk2 <- end_chunk1 + 4
   end_chunk2 <- start_chunk2 + seg_len*dsize - 1
   chunk2 <- readBin(df[start_chunk2:end_chunk2], "double",
                     n = seg_len, size = dsize)
-  # this one is the actual XIC
+  # chunk3 is the actual XIC
   start_chunk3 <- end_chunk2 + 2
   end_chunk3 <- start_chunk3 + seg_len*dsize - 1
-  chunk3 <- readBin(df[start_chunk3:end_chunk3], "integer",
+  chunk3 <- readBin(df[start_chunk3:end_chunk3], "double",
                     n = seg_len, size = dsize)
 
   # might be the noise level? always less than chunk3, slightly correlated
-  # subtracting chunk3 - chunk4 gives reasonable trace behavior
   start_chunk4 <- end_chunk3 + 2
   end_chunk4 <- start_chunk4 + seg_len*dsize - 1
-  chunk4 <- readBin(df[start_chunk4:end_chunk4], "integer",
+  chunk4 <- readBin(df[start_chunk4:end_chunk4], "double",
                     n = seg_len, size = dsize)
 
-  xic_data <- tibble::tibble(Chunk1 = chunk1, Time = chunk2,
+  xic_data <- dplyr::tibble(Chunk1 = chunk1, Time = chunk2,
                              XICData = chunk3, NoiseThresh = chunk4)
 
   return(xic_data)
