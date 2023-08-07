@@ -4,12 +4,15 @@
 \alias{extract_peak_areas}
 \title{Extract peak areas stored as blobs in a mass spec alignment}
 \usage{
-extract_peak_areas(msa, ids = NULL)
+extract_peak_areas(msa, ids = NULL, adj = FALSE)
 }
 \arguments{
 \item{msa}{An ms_alignment object to query}
 
 \item{ids}{Compound IDs to get areas for, or NULL to get all peak areas}
+
+\item{adj}{Should QC-adjusted peak areas be returned instead of raw peak
+areas? Defaults to FALSE.}
 }
 \value{
 A tibble containing the peak areas and another containing boolean

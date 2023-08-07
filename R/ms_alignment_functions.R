@@ -435,13 +435,15 @@ extract_isotope_pattern_blob <- function(blb, zip_dir = tempdir()) {
 #'
 #' @param msa An ms_alignment object to query
 #' @param ids Compound IDs to get areas for, or NULL to get all peak areas
+#' @param adj Should QC-adjusted peak areas be returned instead of raw peak
+#'  areas? Defaults to FALSE.
 #'
 #' @return A tibble containing the peak areas and another containing boolean
 #'  flag reporting whether the peak exists or not
 #'
 #' @importFrom rlang .data
 #' @export
-extract_peak_areas <- function(msa, ids = NULL) {
+extract_peak_areas <- function(msa, ids = NULL, adj = FALSE) {
   # blobs contain alternating 64-bit floats and a binary byte specifying whether
   # the area was calculated. Presumably this is to differentiate between true
   # zeroes and NA values?
@@ -455,7 +457,19 @@ extract_peak_areas <- function(msa, ids = NULL) {
   # get only study file IDs that were actually integrated (Sample, QC, and Blank)
   sfids <- msa$input_files$StudyFileID[which(msa$input_files$SampleType != "Identification Only")]
 
-  area_data <- lapply(X = msa$unknown_compound_items$Area[idx],
+  # get the desired type of area blobs
+  if(adj) {
+    area_blobs <- msa$unknown_compound_items$NormArea[idx]
+    # many compounds are not normalized, so we need to deal with those
+    found_area_idx <- which(!sapply(area_blobs, is.null))
+    area_blobs <- area_blobs[!sapply(area_blobs, is.null)]
+  } else {
+    area_blobs <- msa$unknown_compound_items$Area[idx]
+    # excluded compounds don't get integrated, so we need to deal with those
+    found_area_idx <- which(!sapply(area_blobs, is.null))
+    area_blobs <- area_blobs[!sapply(area_blobs, is.null)]
+  }
+  area_data <- lapply(X = area_blobs,
                       FUN = function(blb) {
                         area_values <- blb[-seq.int(from = 9, to = length(blb), by = 9)]
                         area_values <- readBin(area_values, what = numeric(), n = length(area_values)/8)
@@ -468,13 +482,33 @@ extract_peak_areas <- function(msa, ids = NULL) {
                       })
   area_data <- purrr::transpose(area_data)
 
+
   areas <- do.call(rbind, area_data$area)
+
+  # if there are any IDs with un-integrated peaks
+  if(length(found_area_idx) < length(idx)) {
+    df <- matrix(NA_real_, nrow = length(idx), ncol = ncol(areas))
+    df[found_area_idx, ] <- areas
+    # assign expanded matrix
+    areas <- df
+  }
+
   rownames(areas) <- ids
   areas <- tibble::as_tibble(t(areas), .name_repair = "minimal")
   areas <- dplyr::mutate(areas, StudyFileID = sfids,
                          .before = 1)
 
   flags <- do.call(rbind, area_data$flag)
+
+  # if there are any IDs with un-integrated peaks
+  if(length(found_area_idx) < length(idx)) {
+    # sensible value here is false, not NA
+    df <- matrix(FALSE, nrow = length(idx), ncol = ncol(flags))
+    df[found_area_idx, ] <- flags
+    # assign expanded matrix
+    flags <- df
+  }
+
   rownames(flags) <- ids
   flags <- tibble::as_tibble(t(flags), .name_repair = "minimal")
   flags <- dplyr::mutate(flags, StudyFileID = sfids,
