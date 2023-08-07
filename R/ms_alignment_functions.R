@@ -291,6 +291,39 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
   return(mzcloud_hits)
 }
 
+#' Get ChemSpider matches associated with particular compounds
+#'
+#' Queries a mass spec alignment database to get any ChemSpider matches associated
+#' with some or all compounds.
+#'
+#' @param msa An ms_alignment object to query
+#' @param ids Compound IDs to get matches for, or NULL to get all matches
+#'
+#' @return A tibble with the ChemSpider matches
+#'
+#' @importFrom rlang .data
+#' @export
+get_chemspider_matches <- function(msa, ids = NULL) {
+  if(is.null(ids)) {
+    ids <- msa$unknown_compound_items$ID
+  }
+
+  # get the match IDs associated with all compounds
+  ucids <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsChemSpiderResultItems")
+  # get the table of all ChemSpider matches
+  cs_results <- dplyr::tbl(msa$db_connection, "ChemSpiderResultItems")
+
+  # get only the matches associated with the compounds we're interested in
+  all_matches <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+  # merge tables
+  all_matches <- dplyr::left_join(all_matches, cs_results,
+                               by = c("ChemSpiderResultItemsChemSpiderID" = "ChemSpiderID"))
+  # get local copy of the data
+  all_matches <- dplyr::collect(all_matches)
+
+  return(all_matches)
+}
+
 #' Retrieve extracted ion chromatograms (XICs) associated with compounds
 #'
 #' Queries a mass spec alignment database to get all the extracted ion chromatograms
