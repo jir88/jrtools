@@ -39,12 +39,12 @@ knn_trim <- function(graph, k = 3, method = "max", edge_mode = "all") {
     # if we're keeping largest edge weights
     if(method == "max") {
       # rank edges smallest to largest
-      edge_ranks <- rank(igraph::E(graph)[v_edges]$weight, ties.method = "max")
+      edge_ranks <- rank(v_edges$weight, ties.method = "max")
       # grab the highest k ranks (aka the largest weights)
       k_idx <- which(edge_ranks > (length(v_edges) - k))
     } else { # keeping smallest weights
       # rank edges smallest to largest
-      edge_ranks <- rank(igraph::E(graph)[v_edges]$weight, ties.method = "min")
+      edge_ranks <- rank(v_edges$weight, ties.method = "min")
       # grab the lowest k ranks (aka the smallest weights)
       k_idx <- which(edge_ranks <= k)
     }
