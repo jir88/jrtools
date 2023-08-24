@@ -253,42 +253,62 @@ get_compound_spectra <- function(msa, ids = NULL) {
 
 #' Retrieve cloud spectral library matches
 #'
-#' Queries a mass spec alignment database to get the cloud-based spectral libary
+#' Queries a mass spec alignment database to get the cloud-based spectral library
 #' matches for some or all compounds.
 #'
 #' @param msa An ms_alignment object to query
 #' @param ids Compound IDs to get matches for, or NULL to get all matches
 #'
-#' @return A tibble with the cloud library matches
+#' @return A tibble with the cloud library matches, or NA if this alignment
+#'  database does not contain such data. An empty tibble indicates that cloud
+#'  library matches exist, but none of the requested compounds have such matches.
 #'
 #' @importFrom rlang .data
 #' @export
 get_spectral_cloud_matches <- function(msa, ids = NULL) {
+  # check to see if there are any hits at all
+  if(!DBI::dbExistsTable(msa$db_connection, "MzCloudSearchResultItems")) {
+    simpleWarning("This alignment database does not have cloud library matches!")
+    return(NA)
+  }
+  # if no IDs are specified, return hits for all consolidated compounds
   if(is.null(ids)) {
-    # get the mzCloud hit IDs associated with all compounds
-    df <- DBI::dbReadTable(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
-    # get mzCloud search results associated with all compounds
-    unk_comp_search_res <- DBI::dbReadTable(msa$db_connection,
-                                            "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
-    # get all mzCloud hits -- less detail, but points to relevant spectra
-    mzcloud_hits <- DBI::dbReadTable(msa$db_connection, "MzCloudHitItems")
-    # merge tables
-    mzcloud_hits <- dplyr::full_join(x = df, y = mzcloud_hits,
-                                               by = c("MzCloudHitItemsID" = "ID"))
-  } else {
-    # get the composition IDs associated with compounds of interest
-    mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
-    query_mzcloud_ids <- dplyr::filter(mzcloud_id_tbl, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
-    # read predicted elemental compositions of those items
-    mzcloud_hit_tbl <- dplyr::tbl(msa$db_connection, "MzCloudHitItems")
-
-    mzcloud_hits <- dplyr::left_join(x = query_mzcloud_ids, y = mzcloud_hit_tbl,
-                                               by = c("MzCloudHitItemsID" = "ID"))
-    # get local copy of the data
-    mzcloud_hits <- dplyr::collect(mzcloud_hits)
+    ids <- msa$unknown_compound_items$ID
   }
 
-  return(mzcloud_hits)
+  # old database format lacks the cloud "hits", so we start with "search results"
+  # get the mzCloud search result IDs associated with compounds of interest
+  mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
+  mzcloud_search_res_tbl <- dplyr::tbl(msa$db_connection, "MzCloudSearchResultItems")
+
+  # get just the search results we're interested in
+  cloud_matches <- dplyr::filter(mzcloud_id_tbl, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+  cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_search_res_tbl,
+                                    by = c("MzCloudSearchResultItemsID" = "ID"))
+
+  # if this database has the "hits", we'll put them in too
+  if(DBI::dbExistsTable(msa$db_connection, "MzCloudHitItems")) {
+    # read the mzCloud hit info for all items
+    mzcloud_hit_tbl <- dplyr::tbl(msa$db_connection, "MzCloudHitItems")
+    # get the search to hit mapping
+    mzcloud_hit_ids <- dplyr::tbl(msa$db_connection, "MzCloudHitItemsMzCloudSearchResultItems")
+    # add hit info to search results
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_hit_ids,
+                                      by = c("MzCloudSearchResultItemsID"))
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_hit_tbl,
+                                      by = c("MzCloudHitItemsID" = "ID",
+                                             "Name"),
+                                      suffix = c(".result", ".hit"))
+    # can also pull in associated spectral blobs
+    library_spectra_tbl <- dplyr::tbl(msa$db_connection, "LibrarySpectrumItems")
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = library_spectra_tbl,
+                                      by = c("LibrarySpectrumId" = "ID"))
+  }
+
+  # get local copy of the data
+  cloud_matches <- dplyr::collect(cloud_matches)
+
+  return(cloud_matches)
 }
 
 #' Get ChemSpider matches associated with particular compounds

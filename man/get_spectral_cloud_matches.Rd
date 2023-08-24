@@ -12,9 +12,11 @@ get_spectral_cloud_matches(msa, ids = NULL)
 \item{ids}{Compound IDs to get matches for, or NULL to get all matches}
 }
 \value{
-A tibble with the cloud library matches
+A tibble with the cloud library matches, or NA if this alignment
+ database does not contain such data. An empty tibble indicates that cloud
+ library matches exist, but none of the requested compounds have such matches.
 }
 \description{
-Queries a mass spec alignment database to get the cloud-based spectral libary
+Queries a mass spec alignment database to get the cloud-based spectral library
 matches for some or all compounds.
 }
