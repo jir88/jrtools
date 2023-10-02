@@ -62,6 +62,54 @@ fancy_scientific <- function(l) {
   parse(text=l)
 }
 
+#' Pretty scientific notation labeling function for use with ggplot2 scales.
+#'
+#' Converts supplied breaks into labels using plotmath formatting to generate
+#' pretty scientific notation. A prettier version of [scales::label_scientific()].
+#'
+#' @param digits the maximum number of significant digits to show before the exponent
+#' @param prefix string to add before each label
+#' @param suffix string to add after each label
+#' @param decimal.mark character to be used as the decimal point
+#' @param trim whether values should be trimmed or else right-justified to a common width
+#' @return A function which takes a numeric vector and converts it to pretty labels
+#' @export
+label_pretty_scientific <- function(digits = 3, prefix = "", suffix = "",
+                                    decimal.mark = ".", trim = TRUE) {
+
+  return(function(x) {
+    # handle empty input vector
+    if(length(x) == 0) {
+      return(character(0))
+    }
+    # round to the specified maximum number of significant figures
+    x <- signif(x, digits = digits)
+    # generate formatted output
+    output <- format(x, decimal.mark = decimal.mark, trim = trim, #digits = digits,
+                     scientific = TRUE)
+
+    # make zero actually zero
+    output[x == 0] <- "0"
+    # quote the part before the exponent to keep all the digits
+    output <- gsub("^(.*)e", "'\\1'e", output)
+    # remove + after exponent, if exists. E.g.: (3x10^+2 -> 3x10^2)
+    output <- gsub("e\\+","e", output)
+    # turn the 'e' into plotmath format
+    output <- gsub("e", "%*%10^", output)
+    # convert 1x10^ or 1.000x10^ -> 10^
+    output <- gsub("\\'1[\\.0]*\\'\\%\\*\\%", "", output)
+
+    # add prefix and suffix
+    l <- paste0('"', prefix, '"~', output, '~"', suffix, '"')
+    # parse(text = l)
+    # return this as an expression
+    return(parse(text=l))
+  })
+
+
+
+}
+
 #' Construct lollipop plots
 #'
 #' Displays a set of label/value pairs in a lollipop plot.
