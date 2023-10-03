@@ -96,14 +96,24 @@ label_pretty_scientific <- function(digits = 3, prefix = "", suffix = "",
     output <- gsub("e\\+","e", output)
     # turn the 'e' into plotmath format
     output <- gsub("e", "%*%10^", output)
+
     # convert 1x10^ or 1.000x10^ -> 10^
-    output <- gsub("\\'1[\\.0]*\\'\\%\\*\\%", "", output)
+    # only do this when ALL values are like this or else 0
+    mant_ones <- grepl("^\\'1[\\.0]*\\'", output)
+    if(sum(!mant_ones) == 0) {
+      output <- gsub("\\'1[\\.0]*\\'\\%\\*\\%", "", output)
+    }
 
     # add prefix and suffix
-    l <- paste0('"', prefix, '"~', output, '~"', suffix, '"')
+    if(length(prefix) > 0) {
+      output <- paste0('"', prefix, '"~', output)
+    }
+    if(length(suffix) > 0) {
+      output <- paste0(output, '~"', suffix, '"')
+    }
     # parse(text = l)
     # return this as an expression
-    return(parse(text=l))
+    return(parse(text = output))
   })
 
 
