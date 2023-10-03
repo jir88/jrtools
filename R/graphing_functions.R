@@ -84,6 +84,7 @@ label_pretty_scientific <- function(digits = 3, prefix = "", suffix = "",
     }
     # round to the specified maximum number of significant figures
     x <- signif(x, digits = digits)
+
     # generate formatted output
     output <- format(x, decimal.mark = decimal.mark, trim = trim, #digits = digits,
                      scientific = TRUE)
@@ -100,17 +101,20 @@ label_pretty_scientific <- function(digits = 3, prefix = "", suffix = "",
     # convert 1x10^ or 1.000x10^ -> 10^
     # only do this when ALL values are like this or else 0
     mant_ones <- grepl("^\\'1[\\.0]*\\'", output)
-    if(sum(!mant_ones) == 0) {
+    if(sum(!mant_ones & output != "NA") == 0) {
       output <- gsub("\\'1[\\.0]*\\'\\%\\*\\%", "", output)
     }
 
     # add prefix and suffix
-    if(length(prefix) > 0) {
+    if(nchar(prefix) > 0) {
       output <- paste0('"', prefix, '"~', output)
     }
-    if(length(suffix) > 0) {
+    if(nchar(suffix) > 0) {
       output <- paste0(output, '~"', suffix, '"')
     }
+
+    # put any NA values back in
+    output[is.na(x)] <- NA
     # parse(text = l)
     # return this as an expression
     return(parse(text = output))
