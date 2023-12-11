@@ -4,15 +4,19 @@
 \alias{extract_spectral_blob}
 \title{Extract spectral data from an SQLite blob}
 \usage{
-extract_spectral_blob(blb, zip_dir = tempdir())
+extract_spectral_blob(blb, meta = FALSE, zip_dir = tempdir())
 }
 \arguments{
 \item{blb}{A raw vector containing an SQLite blob of spectral data}
 
+\item{meta}{Should spectrum metadata be returned, or just the tibble of
+mass spectral data? Default is FALSE.}
+
 \item{zip_dir}{Directory where XML files should be unzipped}
 }
 \value{
-A tibble containing the mass spectrum.
+A tibble containing the mass spectrum. If meta is TRUE, returns a list
+  with the spectrum metadata and the mass spectrum tibble.
 }
 \description{
 Certain mass spec data alignment formats store feature spectra as SQLite

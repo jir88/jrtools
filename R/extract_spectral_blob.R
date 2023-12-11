@@ -8,13 +8,16 @@
 #' currently extracted by this function.
 #'
 #' @param blb A raw vector containing an SQLite blob of spectral data
+#' @param meta Should spectrum metadata be returned, or just the tibble of
+#'   mass spectral data? Default is FALSE.
 #' @param zip_dir Directory where XML files should be unzipped
 #'
-#' @return A tibble containing the mass spectrum.
+#' @return A tibble containing the mass spectrum. If meta is TRUE, returns a list
+#'   with the spectrum metadata and the mass spectrum tibble.
 #'
 #' @importFrom rlang .data
 #' @export
-extract_spectral_blob <- function(blb, zip_dir = tempdir()) {
+extract_spectral_blob <- function(blb, meta = FALSE, zip_dir = tempdir()) {
   # spectrum blobs are zipped XML files
   # format looks custom, but is human readable
   # contains scan info and centroided spectra
@@ -48,5 +51,17 @@ extract_spectral_blob <- function(blb, zip_dir = tempdir()) {
                                     resolution = .data$R,
                                     signalNoiseRatio = .data$SN)
 
-  return(pk_centroid_data)
+  if(meta) {
+    # currently we just rip the metadata into nested lists
+    hdr <- xml2::as_list(xml2::xml_child(spec_xml, search = "Header"))
+    scan_event <- xml2::as_list(xml2::xml_child(spec_xml, search = "ScanEvent"))
+    prec_info <- xml2::as_list(xml2::xml_child(spec_xml, search = "PrecursorInfo"))
+
+    return(list("Spectrum" = pk_centroid_data,
+                "Header" = hdr,
+                "ScanEvent" = scan_event,
+                "PrecursorInfo" = prec_info))
+  } else {
+    return(pk_centroid_data)
+  }
 }
