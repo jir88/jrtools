@@ -251,6 +251,23 @@ get_compound_spectra <- function(msa, ids = NULL) {
   return(bhi_spectra)
 }
 
+#' Retrieve all spectra in alignment
+#'
+#' Queries a mass spec alignment database to get all the mass spectra in it. The
+#' actual spectra are stored as XML blobs which can be extracted using
+#' extract_spectral_blob.
+#'
+#' @param msa An ms_alignment object to query
+#'
+#' @return A tibble with the spectra
+#'
+#' @importFrom rlang .data
+#' @export
+get_all_spectra <- function(msa) {
+  all_spectra <- dplyr::tbl(msa$db_connection, "MassSpectrumItems")
+  return(dplyr::collect(all_spectra))
+}
+
 #' Retrieve cloud spectral library matches
 #'
 #' Queries a mass spec alignment database to get the cloud-based spectral library
