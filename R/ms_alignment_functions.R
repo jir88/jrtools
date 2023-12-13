@@ -293,33 +293,55 @@ get_spectral_cloud_matches <- function(msa, ids = NULL) {
     ids <- msa$unknown_compound_items$ID
   }
 
-  # old database format lacks the cloud "hits", so we start with "search results"
-  # get the mzCloud search result IDs associated with compounds of interest
-  mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
-  mzcloud_search_res_tbl <- dplyr::tbl(msa$db_connection, "MzCloudSearchResultItems")
-
-  # get just the search results we're interested in
-  cloud_matches <- dplyr::filter(mzcloud_id_tbl, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
-  cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_search_res_tbl,
-                                    by = c("MzCloudSearchResultItemsID" = "ID"))
-
-  # if this database has the "hits", we'll put them in too
+  # newer database formats have a table of "hits" that allegedly has results on
+  # a per spectrum basis. In these databases, the "search results" table has
+  # 'extra' matches to the "hits" that end up associating hits with multiple
+  # compounds. Thus for newer databases we start with hits and pull associated
+  # search results.
   if(DBI::dbExistsTable(msa$db_connection, "MzCloudHitItems")) {
+    # get mapping from compounds to hits
+    compound_hit_key <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudHitItems")
     # read the mzCloud hit info for all items
     mzcloud_hit_tbl <- dplyr::tbl(msa$db_connection, "MzCloudHitItems")
     # get the search to hit mapping
     mzcloud_hit_ids <- dplyr::tbl(msa$db_connection, "MzCloudHitItemsMzCloudSearchResultItems")
-    # add hit info to search results
-    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_hit_ids,
-                                      by = c("MzCloudSearchResultItemsID"))
+    # get the search result table
+    mzcloud_search_res_tbl <- dplyr::tbl(msa$db_connection, "MzCloudSearchResultItems")
+
+    # get hits and search results associated with compounds of interest
+    cloud_matches <- dplyr::filter(compound_hit_key, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
     cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_hit_tbl,
-                                      by = c("MzCloudHitItemsID" = "ID",
-                                             "Name"),
-                                      suffix = c(".result", ".hit"))
-    # can also pull in associated spectral blobs
+                                      by = c("MzCloudHitItemsID" = "ID"))
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_hit_ids,
+                                      by = c("MzCloudHitItemsID"))
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_search_res_tbl,
+                                      by = c("MzCloudSearchResultItemsID" = "ID", "Name"))
+
+    # add data from the compound/search result key
+    mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_id_tbl,
+                                      by = c("MzCloudSearchResultItemsID", "ConsolidatedUnknownCompoundItemsID"),
+                                      suffix = c(".hit", ".searchResult"))
+
+    # move all IDs to the left
+    cloud_matches <- dplyr::relocate(cloud_matches, "MzCloudSearchResultItemsID",
+                                     "SpectrumID", "LibrarySpectrumId",
+                                     .after = .data$MzCloudHitItemsID)
+
+    # pull in library spectral blobs
     library_spectra_tbl <- dplyr::tbl(msa$db_connection, "LibrarySpectrumItems")
     cloud_matches <- dplyr::left_join(x = cloud_matches, y = library_spectra_tbl,
                                       by = c("LibrarySpectrumId" = "ID"))
+  } else {
+    # old database format lacks the cloud "hits", so we start with "search results"
+    # get the mzCloud search result IDs associated with compounds of interest
+    mzcloud_id_tbl <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsMzCloudSearchResultItems")
+    mzcloud_search_res_tbl <- dplyr::tbl(msa$db_connection, "MzCloudSearchResultItems")
+
+    # get just the search results we're interested in
+    cloud_matches <- dplyr::filter(mzcloud_id_tbl, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+    cloud_matches <- dplyr::left_join(x = cloud_matches, y = mzcloud_search_res_tbl,
+                                      by = c("MzCloudSearchResultItemsID" = "ID"))
   }
 
   # get local copy of the data
