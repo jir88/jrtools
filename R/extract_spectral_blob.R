@@ -4,9 +4,6 @@
 #' blobs containing a compressed XML file. This function extracts the stored
 #' data from such blobs.
 #'
-#' The XML file contains a wealth of metadata about the spectrum, which is not
-#' currently extracted by this function.
-#'
 #' @param blb A raw vector containing an SQLite blob of spectral data
 #' @param meta Should spectrum metadata be returned, or just the tibble of
 #'   mass spectral data? Default is FALSE.

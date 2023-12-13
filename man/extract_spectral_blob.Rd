@@ -23,7 +23,3 @@ Certain mass spec data alignment formats store feature spectra as SQLite
 blobs containing a compressed XML file. This function extracts the stored
 data from such blobs.
 }
-\details{
-The XML file contains a wealth of metadata about the spectrum, which is not
-currently extracted by this function.
-}
