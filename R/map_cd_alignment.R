@@ -30,21 +30,25 @@ map_cd_alignment <- function(msa, tables = FALSE) {
   data_connections <- dplyr::tbl(msa$db_connection, "ConnectedDataTypes") %>%
     dplyr::collect()
 
-  # construct list of relationships
+  # construct table of relationships
+  # rather than include the 'ConnectedData' tables as nodes, we set them as
+  # labels on the edge between the two main tables
   df <- data_connections %>%
     dplyr::left_join(y = dplyr::select(data_types, "DataTypeID", "TableName"),
-              by = c("DataTypeID1" = "DataTypeID")) %>%
+                     by = c("DataTypeID1" = "DataTypeID")) %>%
     dplyr::left_join(y = dplyr::select(data_types, "DataTypeID", "TableName"),
-              by = c("DataTypeID2" = "DataTypeID"),
-              suffix = c(".1", ".2")) %>%
-    dplyr::select("ConnectedTableName", "TableName.1", "TableName.2") %>%
-    tidyr::pivot_longer(cols = "TableName.1":"TableName.2", names_to = NULL, values_to = "TableName")
+                     by = c("DataTypeID2" = "DataTypeID"),
+                     suffix = c(".1", ".2")) %>%
+    dplyr::select("TableName.1", "TableName.2", "ConnectedTableName")
 
   # add unconnected tables
+  connected_tables <- c(df$TableName.1, df$TableName.2)
   df2 <- data_types %>%
     dplyr::select("TableName") %>%
-    dplyr::filter(!(.data$TableName %in% df$TableName)) %>%
-    dplyr::mutate(ConnectedTableName = .data$TableName)
+    dplyr::filter(!(.data$TableName %in% connected_tables)) %>%
+    # make self-loops
+    dplyr::mutate(TableName.1 = .data$TableName) %>%
+    dplyr::rename(TableName.2 = "TableName")
   df <- dplyr::bind_rows(df, df2)
 
   # construct the graph
