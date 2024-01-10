@@ -14,7 +14,7 @@ A tibble containing the data
 }
 \description{
 Certain mass spec data alignment formats store feature extracted ion
-chromatograms as SQLite blobs containing a compressed binary file.
+chromatograms as SQLite blobs containing a possibly compressed binary file.
 This function extracts the stored data from such blobs.
 }
 \details{

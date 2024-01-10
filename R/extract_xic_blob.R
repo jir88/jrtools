@@ -1,7 +1,7 @@
 #' Extract XIC data from an SQLite blob
 #'
 #' Certain mass spec data alignment formats store feature extracted ion
-#' chromatograms as SQLite blobs containing a compressed binary file.
+#' chromatograms as SQLite blobs containing a possibly compressed binary file.
 #' This function extracts the stored data from such blobs.
 #'
 #' The precise format of the binary file has not yet been completely elucidated.
@@ -20,8 +20,14 @@ extract_xic_blob <- function(blb) {
   # still need to figure out what exactly it means and whether lengths can be
   # different. Probably header bytes encode that info somehow.
 
-  # decompress the blob
-  df <- memDecompress(from = blb, type = "gzip")
+  # if gzip magic bytes are present, need to decompress
+  if(blb[1] == 0x1f & blb[2] == 0x8b) {
+    # decompress the blob
+    df <- memDecompress(from = blb, type = "gzip")
+  } else {
+    # uncompressed blobs have extra 0x00 on the front for no apparent reason
+    df <- blb[2:length(blb)]
+  }
 
   # First blob has header:
   # BC 01 95 39 4C EA 01 48 B5 27 74 4B BD 23 4C E3 02 [18] 04 00 00 01 17 53
