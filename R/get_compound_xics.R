@@ -1,11 +1,19 @@
 #' Retrieve extracted ion chromatograms (XICs) associated with compounds
 #'
-#' Queries a mass spec alignment database to get all the extracted ion chromatograms
-#' associated with some or all compounds. This includes all identified adducts
-#' and isotopologues.
+#' Queries a Compound Discoverer mass spec alignment database to get all the
+#' extracted ion chromatograms associated with some or all compounds. This
+#' includes all identified adducts and isotopologues. Note that this only gets
+#' XICs where a peak was detected. For gap-filled XICs, see \code{\link{get_gap_xics}}.
+#'
+#' @note
+#' Compound Discoverer software is produced by Thermo Fisher Scientific. This
+#' package is not affiliated with Thermo Fisher Scientific in any way. For an
+#' official Python interface to Compound Discoverer alignment files, see
+#' \url{https://github.com/thermofisherlsms/pyeds}
 #'
 #' @param msa An ms_alignment object to query
-#' @param ids Compound IDs to get XICs for, or NULL to get all XICs
+#' @param ids Compound IDs to get XICs for, or NULL to get XICs associated with
+#'   all compounds
 #'
 #' @return A tibble with the XIC data
 #'
@@ -16,33 +24,43 @@ get_compound_xics <- function(msa, ids = NULL) {
     ids <- msa$unknown_compound_items$ID
   }
 
-  # have to go to the unconsolidated unknown compounds table to get all XICs
-  # get the unconsolidated compound IDs associated with all compounds
+  # key of unconsolidated compound IDs associated with all compounds
   ucids <- dplyr::tbl(msa$db_connection, "ConsolidatedUnknownCompoundItemsUnknownCompoundInstanceItems")
-  # get the table of unconsolidated unknown compounds
+  # table of unconsolidated unknown compounds
   unk_comp_items <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItems")
-  # get the ions associated with unknown compounds
+  # key of ions associated with unknown compounds
   iids <- dplyr::tbl(msa$db_connection, "UnknownCompoundInstanceItemsUnknownCompoundIonInstanceItems")
-  # get the chromatographic peak IDs associated with unknown compounds
+  # table of unknown compound ions
+  unk_comp_ion_items <- dplyr::tbl(msa$db_connection, "UnknownCompoundIonInstanceItems")
+  # key of XIC traces associated with unknown compound ions
   xic_ids <- dplyr::tbl(msa$db_connection, "UnknownCompoundIonInstanceItemsXicTraceItems")
-  # get the table of chromatographic peaks
+  # table of XIC traces
   xic_traces <- dplyr::tbl(msa$db_connection, "XicTraceItems")
-  # get only the peaks associated with the compounds we're interested in
-  xics <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
-  # merge tables
-  xics <- dplyr::left_join(xics, unk_comp_items,
-                           by = c("UnknownCompoundInstanceItemsWorkflowID" = "WorkflowID",
-                                  "UnknownCompoundInstanceItemsID" = "ID"))
-  xics <- dplyr::left_join(xics, iids,
+
+  # assemble ID keys only for the compounds we're interested in
+  keys <- dplyr::filter(ucids, .data$ConsolidatedUnknownCompoundItemsID %in% ids)
+  keys <- dplyr::left_join(keys, iids,
                            by = c("UnknownCompoundInstanceItemsWorkflowID",
                                   "UnknownCompoundInstanceItemsID"))
-  xics <- dplyr::left_join(xics, xic_ids,
+  keys <- dplyr::left_join(keys, xic_ids,
                            by = c("UnknownCompoundIonInstanceItemsWorkflowID",
                                   "UnknownCompoundIonInstanceItemsID"))
-  # some chromatographic peaks aren't associated with a compound
+
+  # now add in the actual data
+  # add features in each file
+  xics <- dplyr::left_join(keys, unk_comp_items,
+                           by = c("UnknownCompoundInstanceItemsWorkflowID" = "WorkflowID",
+                                  "UnknownCompoundInstanceItemsID" = "ID"))
+  # add ions associated with each feature
+  xics <- dplyr::left_join(xics, unk_comp_ion_items,
+                           by = c("UnknownCompoundIonInstanceItemsWorkflowID" = "WorkflowID",
+                                  "UnknownCompoundIonInstanceItemsID" = "ID",
+                                  "FileID", "StudyFileID"),
+                           suffix = c(".compound", ".ion"))
+  # add XIC traces for each ion
   xics <- dplyr::left_join(xics, xic_traces,
                            by = c("XicTraceItemsWorkflowID" = "WorkflowID",
-                                  "XicTraceItemsID" = "ID"),
+                                  "XicTraceItemsID" = "ID", "FileID"),
                            suffix = c(".compound", ".xic"))
   # get local copy of the data
   xics <- dplyr::collect(xics)

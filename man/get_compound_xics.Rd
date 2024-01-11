@@ -9,13 +9,21 @@ get_compound_xics(msa, ids = NULL)
 \arguments{
 \item{msa}{An ms_alignment object to query}
 
-\item{ids}{Compound IDs to get XICs for, or NULL to get all XICs}
+\item{ids}{Compound IDs to get XICs for, or NULL to get XICs associated with
+all compounds}
 }
 \value{
 A tibble with the XIC data
 }
 \description{
-Queries a mass spec alignment database to get all the extracted ion chromatograms
-associated with some or all compounds. This includes all identified adducts
-and isotopologues.
+Queries a Compound Discoverer mass spec alignment database to get all the
+extracted ion chromatograms associated with some or all compounds. This
+includes all identified adducts and isotopologues. Note that this only gets
+XICs where a peak was detected. For gap-filled XICs, see \code{\link{get_gap_xics}}.
+}
+\note{
+Compound Discoverer software is produced by Thermo Fisher Scientific. This
+package is not affiliated with Thermo Fisher Scientific in any way. For an
+official Python interface to Compound Discoverer alignment files, see
+\url{https://github.com/thermofisherlsms/pyeds}
 }
