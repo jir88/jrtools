@@ -34,6 +34,30 @@ get_cdresult_enum <- function(msa, table, enum) {
   column_info <- dplyr::filter(column_info, .data$DBColumnName == enum)
   column_info <- dplyr::collect(column_info)
 
+  # if no results, maybe this enum is actually in a ConnectedData table (a key table)
+  if(nrow(column_info) == 0) {
+    # get table listing all key tables
+    data_types <- dplyr::tbl(src = msa$db_connection, "ConnectedDataTypes")
+    # get table listing all table columns
+    data_types_columns <- dplyr::tbl(src = msa$db_connection, "ConnectedDataTypesColumns")
+    # get table listing all enums
+    enum_data_type_values <- dplyr::tbl(src = msa$db_connection, "EnumDataTypeValues")
+
+    # get column info
+    column_info <- dplyr::filter(data_types, .data$ConnectedTableName == table)
+    column_info <- dplyr::left_join(x = dplyr::select(column_info, "ConnectedTableName",
+                                                      "DataTypeID1", "DataTypeID2"),
+                                    y = data_types_columns,
+                                    by = c("DataTypeID1", "DataTypeID2"))
+    column_info <- dplyr::filter(column_info, .data$DBColumnName == enum)
+    column_info <- dplyr::collect(column_info)
+  }
+
+  # if column not found
+  if(nrow(column_info) == 0) {
+    stop(paste0("Column `", enum, "` not found in table `", table, "`!"))
+  }
+
   # if this column isn't actually an enum
   if(column_info$SpecialValueType != "Enum") {
     warning(paste0("Column `", enum, "` in table `", table, "` is not an enum!"))
