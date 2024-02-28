@@ -32,14 +32,17 @@ flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm =
   sim_tab_spec_id <- sort(unique(sub_library[, "Spectrum"]))
   sim_tab_sim <- rlang::rep_along(sim_tab_spec_id, 0)
 
+  # locate fragment indices all at once
+  match_idx_low <- findInterval(query_spectrum[, "mz"]*ms2_tol_low,
+                                sub_library_mz)
+  match_idx_high <- findInterval(query_spectrum[, "mz"]*ms2_tol_high,
+                                sub_library_mz)
   # for each query fragment
   for(i in 1:nrow(query_spectrum)) {
     frag_mz <- query_spectrum[i, "mz"]
     frag_int <- query_spectrum[i, "intensity"]
     # find matching library fragments
-    # TODO: this is still the slowest step... can we speed it up?
-    match_idx <- findInterval(c(frag_mz*ms2_tol_low, frag_mz*ms2_tol_high), sub_library_mz)
-    match_idx <- (match_idx[1] + 1):match_idx[2]
+    match_idx <- (match_idx_low[i] + 1):match_idx_high[i]
     # which spectra contain each matching fragment?
     match_spectra <- sub_library[match_idx, "Spectrum"]
 
