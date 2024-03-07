@@ -37,8 +37,12 @@ flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm =
                                 sub_library_mz)
   match_idx_high <- findInterval(query_spectrum[, "mz"]*ms2_tol_high,
                                 sub_library_mz)
-  # for each query fragment
-  for(i in 1:nrow(query_spectrum)) {
+
+  # which query spectrum fragments have library fragment matches?
+  query_match_idx <- which((match_idx_high - match_idx_low) > 0)
+
+  # for each query fragment with matches
+  for(i in query_match_idx) {
     frag_mz <- query_spectrum[i, "mz"]
     frag_int <- query_spectrum[i, "intensity"]
     # find matching library fragments
