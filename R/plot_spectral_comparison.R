@@ -25,7 +25,7 @@ plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5) {
   # s1_upper <- spec1[, "mz"]*tol_high
 
   # sort spectrum 2 if it wasn't already
-  spec2 <- spec2[order(spec2[, "mz"]), ]
+  spec2 <- spec2[order(spec2[, "mz"]), , drop = FALSE]
 
   # locate fragment indices all at once
   s2_idx_low <- findInterval(spec1[, "mz"]*tol_low,
