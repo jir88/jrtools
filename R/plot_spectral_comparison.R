@@ -14,8 +14,9 @@
 #' @importFrom rlang .data
 #' @export
 plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5) {
-  spec1 <- as.matrix(spec1)
-  spec2 <- as.matrix(spec2)
+  # select only the m/z and intensity columns to avoid issues with other columns
+  spec1 <- as.matrix(spec1[, c("mz", "intensity")])
+  spec2 <- as.matrix(spec2[, c("mz", "intensity")])
 
   # look for matching peaks
   tol_low <- 1.0 - match_tol_ppm/1e6
