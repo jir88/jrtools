@@ -2,7 +2,7 @@
 % Please edit documentation in R/extract_spectral_blob.R
 \name{extract_spectral_blob}
 \alias{extract_spectral_blob}
-\title{Extract spectral data from an SQLite blob}
+\title{Extract spectral data from Compound Discoverer alignment}
 \usage{
 extract_spectral_blob(blb, meta = FALSE, zip_dir = tempdir())
 }
@@ -19,7 +19,16 @@ A tibble containing the mass spectrum. If meta is TRUE, returns a list
   with the spectrum metadata and the mass spectrum tibble.
 }
 \description{
-Certain mass spec data alignment formats store feature spectra as SQLite
+Compound Discoverer cdResult alignment databases store feature spectra as SQLite
 blobs containing a compressed XML file. This function extracts the stored
 data from such blobs.
+}
+\details{
+Note: specifying a temp directory will speed up extraction of multiple blobs.
+}
+\note{
+Compound Discoverer software is produced by Thermo Fisher Scientific. This
+package is not affiliated with Thermo Fisher Scientific in any way. For an
+official Python interface to Compound Discoverer alignment files, see
+\url{https://github.com/thermofisherlsms/pyeds}
 }
