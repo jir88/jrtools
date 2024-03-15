@@ -32,21 +32,16 @@ extract_spectral_blob <- function(blb, meta = FALSE, zip_dir = tempdir()) {
   pks_node <- xml2::xml_child(spec_xml, search = "PeakCentroids")
   pk_centroids <- xml2::xml_children(pks_node)
   pk_centroid_data <- xml2::xml_attrs(pk_centroids)
+  # shove it into a matrix
+  pk_centroid_data <- do.call(rbind, pk_centroid_data)
+  # convert to numeric
+  class(pk_centroid_data) <- "numeric"
+  # fix up column names without assuming consistent order
+  cn <- colnames(pk_centroid_data)
+  cn <- c("mz", "intensity", "Z", "resolution", "signalNoiseRatio")[match(cn, c("X", "Y", "Z", "R", "SN"))]
+  colnames(pk_centroid_data) <- cn
   # stuff the data into a tidy tibble
-  pk_centroid_data <- dplyr::bind_rows(pk_centroid_data)
-  # convert text to numbers
-  pk_centroid_data <- dplyr::mutate(pk_centroid_data,
-                                    X = as.numeric(.data$X),
-                                    Y = as.numeric(.data$Y),
-                                    Z = as.numeric(.data$Z),
-                                    R = as.numeric(.data$R),
-                                    SN = as.numeric(.data$SN))
-  pk_centroid_data <- dplyr::rename(pk_centroid_data,
-                                    mz = .data$X,
-                                    intensity = .data$Y,
-                                    #Z = .data$Z,
-                                    resolution = .data$R,
-                                    signalNoiseRatio = .data$SN)
+  pk_centroid_data <- tibble::as_tibble(pk_centroid_data, .name_repair = "minimal")
 
   if(meta) {
     # currently we just rip the metadata into nested lists
