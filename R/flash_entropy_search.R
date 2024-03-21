@@ -24,8 +24,8 @@ flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm =
   # grab sub-library for faster searching
   min_mz <- min(query_spectrum[, "mz"])*ms2_tol_low
   max_mz <- max(query_spectrum[, "mz"])*ms2_tol_high
-  idx <- findInterval(c(min_mz, max_mz), fragment_library[, "mz"]) + 1
-  sub_library <- fragment_library[idx[1]:idx[2], ]
+  idx <- findInterval(c(min_mz, max_mz), fragment_library[, "mz"])
+  sub_library <- fragment_library[(idx[1] + 1):idx[2], , drop = FALSE]
   sub_library_mz <- sub_library[, "mz"]
 
   # pre-allocate table
