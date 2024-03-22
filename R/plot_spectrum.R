@@ -13,7 +13,7 @@
 #' @export
 plot_spectrum <- function(spec, label_thresh = NULL) {
   # select only the m/z and intensity columns to avoid issues with other columns
-  spec <- tibble::as_tibble(spec[, c("mz", "intensity")])
+  spec <- tibble::as_tibble(spec[, c("mz", "intensity"), drop = FALSE])
 
   # peak labels
   if(is.numeric(label_thresh)) {
