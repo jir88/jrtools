@@ -7,6 +7,7 @@ Maintainer: John Robinson <john.robinson@wustl.edu>
 Description: Various functions I (re)use frequently for statistical analyses. 
   Also has a few utilities for dealing with mass spec data in various formats.
 Imports:
+    base64enc,
     BiocParallel,
     caret,
     DBI,
