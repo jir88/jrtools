@@ -8,22 +8,22 @@
 #' @param spec2 Spectrum to plot on bottom half of graph. Must have columns named
 #'   'mz' and 'intensity'.
 #' @param match_tol_ppm Fragment matching tolerance in PPM
+#' @param label_thresh Minimum intensity for labeled fragments. Set to NULL for
+#'   no labels.
 #'
 #' @return The ggplot object for rendering or further modification.
 #'
 #' @importFrom rlang .data
 #' @export
-plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5) {
+plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5,
+                                     label_thresh = NULL) {
   # select only the m/z and intensity columns to avoid issues with other columns
-  spec1 <- as.matrix(spec1[, c("mz", "intensity")])
-  spec2 <- as.matrix(spec2[, c("mz", "intensity")])
+  spec1 <- as.matrix(spec1[, c("mz", "intensity"), drop = FALSE])
+  spec2 <- as.matrix(spec2[, c("mz", "intensity"), drop = FALSE])
 
   # look for matching peaks
   tol_low <- 1.0 - match_tol_ppm/1e6
   tol_high <- 1.0 + match_tol_ppm/1e6
-
-  # s1_lower <- spec1[, "mz"]*tol_low
-  # s1_upper <- spec1[, "mz"]*tol_high
 
   # sort spectrum 2 if it wasn't already
   spec2 <- spec2[order(spec2[, "mz"]), , drop = FALSE]
@@ -54,12 +54,10 @@ plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5) {
   spec2[, "intensity"] <- -spec2[, "intensity"]
   # combine spectra
   combo_spec <- tibble::as_tibble(rbind(spec1, spec2))
-  # add marker
-  # combo_spec$Spectrum = rep(c("Spec1", "Spec2"), times = c(nrow(spec1), nrow(spec2)))
   # mark matching fragments
   combo_spec$Matches = c(s1_matches, s2_matches)
 
-  # return the plot
+  # build the plot
   g <- ggplot2::ggplot(combo_spec, ggplot2::aes(x = .data[["mz"]],
                                                 xend = .data[["mz"]],
                                                 y = .data[["intensity"]],
@@ -68,5 +66,21 @@ plot_spectral_comparison <- function(spec1, spec2, match_tol_ppm = 5) {
     ggplot2::geom_hline(yintercept = 0, color = "darkgrey") +
     ggplot2::geom_segment() +
     ggplot2::scale_color_manual(values = c("FALSE" = "black", "TRUE" = "blue"))
+
+  # if we're adding labels
+  if(is.numeric(label_thresh)) {
+    # which peaks are above the threshold?
+    feat_labs <- dplyr::filter(combo_spec, abs(.data[["intensity"]]) > label_thresh)
+    # create labels and set positions based on which spectrum they are in
+    feat_labs <- dplyr::mutate(feat_labs, Label = as.character(round(.data[["mz"]], 4)),
+                               vjust = dplyr::if_else(.data[["intensity"]] > 0,
+                                                      0, 1))
+
+    g <- g + ggplot2::geom_text(data = feat_labs,
+                                mapping = ggplot2::aes(label = .data[["Label"]],
+                                                       vjust = .data[["vjust"]]),
+                                check_overlap = TRUE,
+                                color = "darkgrey", size = 3)
+  }
   return(g)
 }

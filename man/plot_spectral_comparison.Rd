@@ -4,7 +4,7 @@
 \alias{plot_spectral_comparison}
 \title{Plot two mass spectra}
 \usage{
-plot_spectral_comparison(spec1, spec2, match_tol_ppm = 5)
+plot_spectral_comparison(spec1, spec2, match_tol_ppm = 5, label_thresh = NULL)
 }
 \arguments{
 \item{spec1}{Spectrum to plot on top half of graph. Must have columns named
@@ -14,6 +14,9 @@ plot_spectral_comparison(spec1, spec2, match_tol_ppm = 5)
 'mz' and 'intensity'.}
 
 \item{match_tol_ppm}{Fragment matching tolerance in PPM}
+
+\item{label_thresh}{Minimum intensity for labeled fragments. Set to NULL for
+no labels.}
 }
 \value{
 The ggplot object for rendering or further modification.
