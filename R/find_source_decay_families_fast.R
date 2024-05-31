@@ -17,6 +17,9 @@
 #'   with mass spec peak intensities.
 #' @param drt_max Maximum retention time difference (in minutes) to consider.
 #' @param area_cor_min Minimum peak area correlation to consider.
+#' @param cor_fun Function to use when calculating correlation. Defaults to
+#'   \link[stats]{cor}. Must accept parameters \code{x} and \code{y}.
+#' @param ... Other parameters passed to \code{cor_fun}.
 #'
 #' @details
 #' This is a heavily simplified version of \link{find_source_decay_families} that
@@ -37,7 +40,9 @@
 #' @export
 find_source_decay_families_fast <- function(feature_rts, feature_areas,
                                             drt_max = 0.01,
-                                            area_cor_min = 0.8) {
+                                            area_cor_min = 0.8,
+                                            cor_fun = stats::cor,
+                                            ...) {
   # pull feature IDs from RT vector
   feature_ids <- names(feature_rts)
   if(is.null(feature_ids) || length(unique(feature_ids)) < length(feature_ids)) {
@@ -63,7 +68,7 @@ find_source_decay_families_fast <- function(feature_rts, feature_areas,
     # convert to feature area index
     idx1 <- rt2area_idx[idx1]
     idx2 <- rt2area_idx[idx2]
-    return(stats::cor(x = feature_areas[, idx1], y = feature_areas[, idx2]))
+    return(cor_fun(x = feature_areas[, idx1], y = feature_areas[, idx2], ...))
   })
 
   area_cor_matches <- tibble::tibble(Name.1 = feature_ids[rt_matches[, "row"]],

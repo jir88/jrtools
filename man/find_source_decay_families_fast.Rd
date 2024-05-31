@@ -8,7 +8,9 @@ find_source_decay_families_fast(
   feature_rts,
   feature_areas,
   drt_max = 0.01,
-  area_cor_min = 0.8
+  area_cor_min = 0.8,
+  cor_fun = stats::cor,
+  ...
 )
 }
 \arguments{
@@ -23,6 +25,11 @@ with mass spec peak intensities.}
 \item{drt_max}{Maximum retention time difference (in minutes) to consider.}
 
 \item{area_cor_min}{Minimum peak area correlation to consider.}
+
+\item{cor_fun}{Function to use when calculating correlation. Defaults to
+\link[stats]{cor}. Must accept parameters \code{x} and \code{y}.}
+
+\item{...}{Other parameters passed to \code{cor_fun}.}
 }
 \value{
 A list containing:\tabular{ll}{
