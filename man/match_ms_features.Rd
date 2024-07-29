@@ -9,6 +9,8 @@ match_ms_features(
   rt1,
   mz2,
   rt2,
+  id1 = NULL,
+  id2 = NULL,
   ppm_range = c(-5, 5),
   drt_range = c(-0.5, 0.5)
 )
@@ -21,6 +23,12 @@ match_ms_features(
 \item{mz2}{Second set of mass or m/z values}
 
 \item{rt2}{Second set of retention times}
+
+\item{id1}{Unique ID values for the first set of features. If NULL, IDs are
+generated using the format MZ@RT.}
+
+\item{id2}{Unique ID values for the second set of features. If NULL, IDs are
+generated using the format MZ@RT.}
 
 \item{ppm_range}{A length-two numeric giving the minimum and maximum allowed
 differences between feature masses in parts per million}

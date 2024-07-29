@@ -10,6 +10,10 @@
 #' @param rt1 First set of retention times
 #' @param mz2 Second set of mass or m/z values
 #' @param rt2 Second set of retention times
+#' @param id1 Unique ID values for the first set of features. If NULL, IDs are
+#' generated using the format MZ@RT.
+#' @param id2 Unique ID values for the second set of features. If NULL, IDs are
+#' generated using the format MZ@RT.
 #' @param ppm_range A length-two numeric giving the minimum and maximum allowed
 #' differences between feature masses in parts per million
 #' @param drt_range A length-two numeric giving the minimum and maximum allowed
@@ -20,15 +24,21 @@
 #' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @export
-match_ms_features <- function(mz1, rt1, mz2, rt2, ppm_range = c(-5, 5),
-                             drt_range = c(-0.5, 0.5)) {
+match_ms_features <- function(mz1, rt1, mz2, rt2, id1 = NULL, id2 = NULL,
+                              ppm_range = c(-5, 5),
+                              drt_range = c(-0.5, 0.5)) {
+  # generate feature IDs if none specified
+  if(is.null(id1)) {
+    id1 <- stringr::str_c(mz1, "@", rt1)
+  }
+  if(is.null(id2)) {
+    id2 <- stringr::str_c(mz2, "@", rt2)
+  }
   # find close masses (within 25 ppm)
   delta_mass <- outer(mz1, mz2,
                       FUN = function(x, y) { return((x - y)/y*1e6) })
-  # colnames(delta_mass) <- stringr::str_c(mdro_acquirex_features$Mass, "@",
-  #                                        mdro_acquirex_features$RT)
-  colnames(delta_mass) <- stringr::str_c(mz2, "@", rt2)
-  rownames(delta_mass) <- stringr::str_c(mz1, "@", rt1)
+  colnames(delta_mass) <- id2
+  rownames(delta_mass) <- id1
 
   feature_comparison <- tibble::as_tibble(delta_mass, rownames = "Feature1",
                                           .name_repair = "minimal") %>%
