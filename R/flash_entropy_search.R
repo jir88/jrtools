@@ -29,7 +29,7 @@ flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm =
   sub_library_mz <- sub_library[, "mz"]
 
   # pre-allocate table
-  sim_tab_spec_id <- sort(unique(sub_library[, "Spectrum"]))
+  sim_tab_spec_id <- unique(sub_library[, "Spectrum"])
   sim_tab_sim <- rlang::rep_along(sim_tab_spec_id, 0)
 
   # locate fragment indices all at once
