@@ -17,25 +17,26 @@
 #'
 #' @export
 flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm = 5.0) {
-  # TODO: allow identity search (match precursors)
   ms2_tol_low <- 1.0 - ms2_tol_ppm/1e6
   ms2_tol_high <- 1.0 + ms2_tol_ppm/1e6
 
+  # pull query spectrum m/z ratios once, not multiple times
+  query_mz <- query_spectrum[, "mz"]
   # grab sub-library for faster searching
-  min_mz <- min(query_spectrum[, "mz"])*ms2_tol_low
-  max_mz <- max(query_spectrum[, "mz"])*ms2_tol_high
+  min_mz <- min(query_mz)*ms2_tol_low
+  max_mz <- max(query_mz)*ms2_tol_high
   idx <- findInterval(c(min_mz, max_mz), fragment_library[, "mz"])
   sub_library <- fragment_library[(idx[1] + 1):idx[2], , drop = FALSE]
   sub_library_mz <- sub_library[, "mz"]
 
   # pre-allocate table
   sim_tab_spec_id <- unique(sub_library[, "Spectrum"])
-  sim_tab_sim <- rlang::rep_along(sim_tab_spec_id, 0)
+  sim_tab_sim <- numeric(length = length(sim_tab_spec_id))
 
   # locate fragment indices all at once
-  match_idx_low <- findInterval(query_spectrum[, "mz"]*ms2_tol_low,
+  match_idx_low <- findInterval(query_mz*ms2_tol_low,
                                 sub_library_mz)
-  match_idx_high <- findInterval(query_spectrum[, "mz"]*ms2_tol_high,
+  match_idx_high <- findInterval(query_mz*ms2_tol_high,
                                 sub_library_mz)
 
   # which query spectrum fragments have library fragment matches?
@@ -43,7 +44,6 @@ flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm =
 
   # for each query fragment with matches
   for(i in query_match_idx) {
-    frag_mz <- query_spectrum[i, "mz"]
     frag_int <- query_spectrum[i, "intensity"]
     # find matching library fragments
     match_idx <- (match_idx_low[i] + 1):match_idx_high[i]
