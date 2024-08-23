@@ -37,6 +37,8 @@
 #' @importFrom dplyr %>%
 #' @importFrom rlang .data
 #' @importFrom rlang .env
+#' @useDynLib jrtools
+#' @importFrom Rcpp evalCpp
 #' @export
 find_source_decay_families_fast <- function(feature_rts, feature_areas,
                                             drt_max = 0.01,
@@ -58,9 +60,8 @@ find_source_decay_families_fast <- function(feature_rts, feature_areas,
 
   # Find similar retention time pairs ----
 
-  delta_rt <- abs(outer(feature_rts, feature_rts, FUN = "-"))
-  delta_rt[lower.tri(delta_rt, diag = TRUE)] <- NA
-  rt_matches <- which(delta_rt < drt_max, arr.ind = TRUE)
+  rt_matches <- findMatchesC(feature_rts, drt_max)
+  colnames(rt_matches) <- c("row", "col", "dRT")
 
   # Find pairs that also have correlated peak areas ----
 
@@ -73,7 +74,7 @@ find_source_decay_families_fast <- function(feature_rts, feature_areas,
 
   area_cor_matches <- tibble::tibble(Name.1 = feature_ids[rt_matches[, "row"]],
                                      Name.2 = feature_ids[rt_matches[, "col"]],
-                                     dRT = delta_rt[rt_matches],
+                                     dRT = rt_matches[, "dRT"],
                                      Correlation = df2) %>%
     dplyr::filter(.data$Correlation > area_cor_min)
 

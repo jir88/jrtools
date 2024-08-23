@@ -19,6 +19,7 @@ Imports:
     methods,
     MSnbase,
     purrr,
+    Rcpp (>= 1.0.0),
     readr,
     readxl,
     rlang,
@@ -36,6 +37,7 @@ Suggests:
     GGally,
     ranger,
     testthat (>= 3.0.0)
+LinkingTo: Rcpp
 License: LGPL
 Encoding: UTF-8
 LazyData: true
