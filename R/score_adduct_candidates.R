@@ -40,6 +40,8 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
     oap_match_intensity <- sum(ms1_spec$intensity[unique(df[, "col"])])
     return(list("adduct_idx" = oap_match_idx,
                 "adduct_names" = all_adducts$`Ion name`[oap_match_idx],
+                "adduct_polarities" = all_adducts$polarity[oap_match_idx],
+                "adduct_mz" = other_adduct_mz[oap_match_idx],
                 "num_matches" = num_oap_matches,
                 "match_intensity" = oap_match_intensity))
   })
@@ -48,5 +50,9 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
   df2 <- tibble::as_tibble(purrr::list_transpose(oap_match_data))
   df2$Candidate = adduct_candidates$`Ion name`
   df2 <- dplyr::arrange(df2, dplyr::desc(.data$num_matches), dplyr::desc(.data$match_intensity))
+  # convert to tidy arrangement
+  df2 <- dplyr::mutate(df2, candidate_idx = dplyr::row_number(), .before = .data$adduct_idx)
+  df2 <- tidyr::unnest(df2, cols = c("adduct_idx", "adduct_names", "adduct_polarities", "adduct_mz"))
+  df2 <- dplyr::arrange(df2, .data$candidate_idx, .data$adduct_polarities, .data$adduct_mz)
   return(df2)
 }
