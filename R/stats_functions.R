@@ -388,7 +388,7 @@ multi.cv.glmnet <- function(x, y, family = "binomial", eta = 0, nfolds = 10,
     dplyr::mutate(Upper = .data$Mean + .data$SEM, Lower = .data$Mean - .data$SEM)
 
   # which lambda value gives the lowest average deviance on hold-out sets?
-  min_avg_dev <- dplyr::slice_min(cv_lasso_results, order_by = "Mean", n = 1, with_ties = FALSE)
+  min_avg_dev <- dplyr::slice_min(cv_lasso_results, order_by = Mean, n = 1, with_ties = FALSE)
   lambda_min <- min_avg_dev$Lambda
 
   # which lambda value gives the simplest model within 1-SEM of the minimum?
@@ -396,7 +396,7 @@ multi.cv.glmnet <- function(x, y, family = "binomial", eta = 0, nfolds = 10,
   lambda_1se <- cv_lasso_results %>%
     dplyr::filter(.data$Lambda >= lambda_min) %>%
     dplyr::filter(.data$Mean <= dev_thresh) %>%
-    dplyr::slice_max(order_by = "Mean", n = 1, with_ties = FALSE)
+    dplyr::slice_max(order_by = Mean, n = 1, with_ties = FALSE)
   lambda_1se <- lambda_1se$Lambda
 
   output <- list(full_fit = init_fit, lambda_min = lambda_min,
