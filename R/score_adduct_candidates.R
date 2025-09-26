@@ -32,8 +32,8 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
     other_adduct_ppm <- outer(other_adduct_mz, ms1_spec$mz,
                               FUN = function(x, y) { return((x - y)/y*1e6) })
     # where are the hits?
-    df <- which(abs(other_adduct_ppm) < ppm_thresh, arr.ind = TRUE)
-    df <- as.data.frame(df)
+    idx <- which(abs(other_adduct_ppm) < ppm_thresh, arr.ind = TRUE)
+    df <- as.data.frame(idx)
     # pull peak intensities
     df$intensity <- ms1_spec$intensity[unique(df[, "col"])]
     # number of unique rows is the number of other adducts that match 1+ MS1 peaks
@@ -41,6 +41,13 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
     num_oap_matches <- length(oap_match_idx)
     # get max matching peak intensity for each putative adduct
     max_match_intensities <- sapply(X = oap_match_idx, FUN = function(a) max(df[df$row == a, ]$intensity))
+    # get min matching peak PPM for each putative adduct
+    df2 <- as.data.frame(idx)
+    df2$ppm <- other_adduct_ppm[idx]
+    min_match_ppms <- sapply(X = oap_match_idx, FUN = function(a) {
+      mdf <- df2[df2$row == a, ]
+      return(mdf$ppm[which.min(abs(mdf$ppm))])
+    })
     # calculate total intensity associated with all matched MS1 peaks
     oap_match_intensity <- sum(ms1_spec$intensity[unique(df[, "col"])])
     return(list("adduct_idx" = oap_match_idx,
@@ -48,6 +55,7 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
                 "adduct_polarities" = all_adducts$polarity[oap_match_idx],
                 "adduct_mz" = other_adduct_mz[oap_match_idx],
                 "adduct_max_intensities" = max_match_intensities,
+                "adduct_min_ppms" = min_match_ppms,
                 "num_matches" = num_oap_matches,
                 "match_intensity" = oap_match_intensity))
   })
@@ -55,12 +63,16 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
   # break ties using total explained intensity
   df2 <- tibble::as_tibble(purrr::list_transpose(oap_match_data))
   df2$Candidate = adduct_candidates$`Ion name`
+  # drop empty adducts
+  df2 <- dplyr::filter(df2, .data$num_matches > 0)
+  # sort the matching ones
   df2 <- dplyr::arrange(df2, dplyr::desc(.data$num_matches), dplyr::desc(.data$match_intensity))
   # convert to tidy arrangement
   df2 <- dplyr::mutate(df2, candidate_idx = dplyr::row_number(), .before = "adduct_idx")
   df2 <- tidyr::unnest(df2, cols = c("adduct_idx", "adduct_names",
                                      "adduct_polarities", "adduct_mz",
-                                     "adduct_max_intensities"))
+                                     "adduct_max_intensities",
+                                     "adduct_min_ppms"))
   df2 <- dplyr::arrange(df2, .data$candidate_idx, .data$adduct_polarities, .data$adduct_mz)
   return(df2)
 }
