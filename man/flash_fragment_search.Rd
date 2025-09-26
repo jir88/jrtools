@@ -17,7 +17,7 @@ Must have columns "Spectrum", "mz", and "intensity"}
 }
 \value{
 A tibble containing the number of query ions found in each compound
-  spectrum.
+  spectrum, plus the total intensity of those ions.
 }
 \description{
 Given a library of compound spectra and a set of fragment ions, this function

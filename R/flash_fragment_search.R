@@ -14,7 +14,7 @@
 #' @param ms2_tol_ppm Fragment matching tolerance in PPM
 #'
 #' @return A tibble containing the number of query ions found in each compound
-#'   spectrum.
+#'   spectrum, plus the total intensity of those ions.
 #'
 #' @export
 flash_fragment_search <- function(fragment_library, query_ions, ms2_tol_ppm = 5.0) {
@@ -25,7 +25,9 @@ flash_fragment_search <- function(fragment_library, query_ions, ms2_tol_ppm = 5.
 
   # pre-allocate table
   frag_tab_spec_id <- sort(unique(fragment_library[, "Spectrum"]))
-  frag_tab_sim <- rlang::rep_along(frag_tab_spec_id, 0)
+  n_ids <- length(frag_tab_spec_id)
+  frag_tab_sim <- integer(length = n_ids)
+  frag_tab_match_int <- numeric(length = n_ids)
 
   # locate query ion indices all at once
   match_idx_low <- findInterval(query_ions[, "mz"]*ms2_tol_low,
@@ -42,13 +44,16 @@ flash_fragment_search <- function(fragment_library, query_ions, ms2_tol_ppm = 5.
     match_idx <- (match_idx_low[i] + 1):match_idx_high[i]
     # which spectra contain each matching fragment?
     match_spectra <- fragment_library[match_idx, "Spectrum"]
+    match_int <- fragment_library[match_idx, "intensity"]
 
     # increment match counts
     sim_idx <- match(match_spectra, frag_tab_spec_id)
     frag_tab_sim[sim_idx] <- frag_tab_sim[sim_idx] + 1
+    frag_tab_match_int[sim_idx] <- frag_tab_match_int[sim_idx] + match_int
   }
 
   similarity_table <- tibble::tibble(Spectrum = frag_tab_spec_id,
-                             Matches = frag_tab_sim)
+                                     Matches = frag_tab_sim,
+                                     MatchIntensity = frag_tab_match_int)
   return(similarity_table)
 }
