@@ -7,13 +7,13 @@
 fancy_scientific(l)
 }
 \arguments{
-\item{l}{a single numeric value to be formatted}
+\item{l}{numeric vector of values to be formatted}
 }
 \value{
 an expression in plotmath format for displaying this value
 }
 \description{
-Converts a number into scientific notation using plotmath formatting. The
+Converts numbers into scientific notation using plotmath formatting. The
 resulting expression can be used in ggplot2 labels.
 }
 \details{

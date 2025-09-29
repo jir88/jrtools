@@ -37,29 +37,49 @@ fancy_roc_plot <- function(data) {
 
 #' Generate plotmath-formatted scientific notation expressions
 #'
-#' Converts a number into scientific notation using plotmath formatting. The
+#' Converts numbers into scientific notation using plotmath formatting. The
 #' resulting expression can be used in ggplot2 labels.
 #'
-#' @param l a single numeric value to be formatted
+#' @param l numeric vector of values to be formatted
 #' @return an expression in plotmath format for displaying this value
 #' @details There isn't really any error-checking here. Put garbage in, you'll
 #'   get garbage out.
 #' @export
 fancy_scientific <- function(l) {
-  # turn in to character string in scientific notation
-  l <- format(l, scientific = TRUE)
-  # make zero actually zero
-  l <- gsub("0e\\+00","0",l)
-  # quote the part before the exponent to keep all the digits
-  l <- gsub("^(.*)e", "'\\1'e", l)
-  # remove + after exponent, if exists. E.g.: (3x10^+2 -> 3x10^2)
-  l <- gsub("e\\+","e",l)
-  # turn the 'e+' into plotmath format
-  l <- gsub("e", "%*%10^", l)
-  # convert 1x10^ or 1.000x10^ -> 10^
-  l <- gsub("\\'1[\\.0]*\\'\\%\\*\\%", "", l)
-  # return this as an expression
-  parse(text=l)
+  # this is supposed to be vectorized, so we cheat
+  # we convert all numbers to scientific at once so we get consistent
+  # numbers of significant figures
+  all_txts <- format(l, scientific = TRUE)
+  # now we process each one, creating a list of 'call' objects
+  val_exprs <- sapply(X = all_txts, USE.NAMES = FALSE, FUN = function(txt_val) {
+    # this always has coefficient and exponent
+    txt_parts <- strsplit(x = txt_val, split = "e")[[1]]
+
+    # special case for zero coefficient
+    if(as.numeric(txt_parts[1]) == 0) {
+      return(bquote(0))
+    }
+
+    # quote the coefficient to keep sig figs
+    txt_coef <- paste0("'", txt_parts[1], "'")
+    exp_num <- as.numeric(txt_parts[2])
+    # if exponent is 0, just give the number
+    if(exp_num == 0) {
+      return(str2expression(txt_coef)[[1]])
+    }
+    # if coefficient is 1, just give the exponent
+    if(as.numeric(txt_parts[1]) == 1) {
+      return(str2expression(paste0("10^", exp_num))[[1]])
+    }
+    # if coefficient is -1, just give the exponent
+    if(as.numeric(txt_parts[1]) == -1) {
+      return(str2expression(paste0("-10^", exp_num))[[1]])
+    }
+    txt_coef <- paste0(txt_parts[1], "\u00D7")
+    return(bquote(.(txt_coef) * 10^.(exp_num)))
+  })
+  # now return the expression vector that ggplot demands
+  return(as.expression(val_exprs))
 }
 
 #' Pretty scientific notation labeling function for use with ggplot2 scales.
