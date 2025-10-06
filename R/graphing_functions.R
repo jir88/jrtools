@@ -52,6 +52,10 @@ fancy_scientific <- function(l) {
   all_txts <- format(l, scientific = TRUE)
   # now we process each one, creating a list of 'call' objects
   val_exprs <- sapply(X = all_txts, USE.NAMES = FALSE, FUN = function(txt_val) {
+    # check for NAs
+    if(endsWith(txt_val, "NA")) {
+      return(str2expression(""))
+    }
     # this always has coefficient and exponent
     txt_parts <- strsplit(x = txt_val, split = "e")[[1]]
 
