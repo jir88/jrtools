@@ -36,17 +36,24 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
     df <- as.data.frame(idx)
     # pull peak intensities
     df$intensity <- ms1_spec$intensity[unique(df[, "col"])]
+    # pull peak m/z
+    df$match_mz <- ms1_spec$mz[unique(df[, "col"])]
+    # pull match ppm
+    df$match_ppm <- other_adduct_ppm[idx]
     # number of unique rows is the number of other adducts that match 1+ MS1 peaks
     oap_match_idx <- unique(df[, "row"])
     num_oap_matches <- length(oap_match_idx)
     # get max matching peak intensity for each putative adduct
     max_match_intensities <- sapply(X = oap_match_idx, FUN = function(a) max(df[df$row == a, ]$intensity))
     # get min matching peak PPM for each putative adduct
-    df2 <- as.data.frame(idx)
-    df2$ppm <- other_adduct_ppm[idx]
     min_match_ppms <- sapply(X = oap_match_idx, FUN = function(a) {
-      mdf <- df2[df2$row == a, ]
-      return(mdf$ppm[which.min(abs(mdf$ppm))])
+      mdf <- df[df$row == a, ]
+      return(mdf$match_ppm[which.min(abs(mdf$match_ppm))])
+    })
+    # get the m/z ratios of the closest PPM matches
+    closest_match_mzs <- sapply(X = oap_match_idx, FUN = function(a) {
+      mdf <- df[df$row == a, ]
+      return(mdf$match_mz[which.min(abs(mdf$match_ppm))])
     })
     # calculate total intensity associated with all matched MS1 peaks
     oap_match_intensity <- sum(ms1_spec$intensity[unique(df[, "col"])])
@@ -56,6 +63,7 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
                 "adduct_mz" = other_adduct_mz[oap_match_idx],
                 "adduct_max_intensities" = max_match_intensities,
                 "adduct_min_ppms" = min_match_ppms,
+                "closest_ms1_mzs" = closest_match_mzs,
                 "num_matches" = num_oap_matches,
                 "match_intensity" = oap_match_intensity))
   })
@@ -70,7 +78,7 @@ score_adduct_candidates <- function(mz, mz_polarity, ms1_spec, all_adducts,
   # convert to tidy arrangement
   df2 <- dplyr::mutate(df2, candidate_idx = dplyr::row_number(), .before = "adduct_idx")
   df2 <- tidyr::unnest(df2, cols = c("adduct_idx", "adduct_names",
-                                     "adduct_polarities", "adduct_mz",
+                                     "adduct_polarities", "adduct_mz", "closest_ms1_mzs",
                                      "adduct_max_intensities",
                                      "adduct_min_ppms"))
   df2 <- dplyr::arrange(df2, .data$candidate_idx, .data$adduct_polarities, .data$adduct_mz)
