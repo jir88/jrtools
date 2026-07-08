@@ -7,7 +7,8 @@
 multiplicative_imputation(X, imp_factor = 1e-11)
 }
 \arguments{
-\item{X}{count or relative abundance matrix where rows are samples and columns are features}
+\item{X}{non-negative count or relative abundance matrix where rows are
+samples and columns are features}
 
 \item{imp_factor}{small proportion to replace zero values with (default 1e-11)}
 }

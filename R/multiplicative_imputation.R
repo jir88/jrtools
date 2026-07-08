@@ -4,7 +4,8 @@
 #' strategy described by Martin-Fernandez et al. (2003). Data will be closed
 #' before zero replacement.
 #'
-#' @param X count or relative abundance matrix where rows are samples and columns are features
+#' @param X non-negative count or relative abundance matrix where rows are
+#' samples and columns are features
 #' @param imp_factor small proportion to replace zero values with (default 1e-11)
 #'
 #' @references
@@ -16,6 +17,14 @@
 #'
 #' @export
 multiplicative_imputation <- function(X, imp_factor = 1e-11){
+  # check that X is non-negative with no missing values
+  nn <- sum(X < 0)
+  if(is.na(nn)) {
+    stop("X has missing values! Replace truly missing values with zero.")
+  }
+  if(nn > 0) {
+    stop("X cannot contain negative values!")
+  }
   # close the data
   rs <- rowSums(X)
   if(sum(rs == 0) > 0) {
