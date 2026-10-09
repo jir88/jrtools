@@ -50,7 +50,7 @@ read_mgf <- function(path) {
     # extract peaks
     pk_idx <- which(!is_hdr[idx1:idx2]) + idx1 - 1
     if(length(pk_idx) > 0) {
-      pks <- strsplit(all_lines[pk_idx], " ", fixed = TRUE)
+      pks <- strsplit(all_lines[pk_idx], "\t", fixed = TRUE)
       pks <- do.call(rbind, pks)
       class(pks) <- "numeric"
       colnames(pks) <- c("mz", "intensity")
