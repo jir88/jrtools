@@ -1,11 +1,13 @@
 Package: jrtools
 Type: Package
 Title: Miscellaneous Statistical and Graphing Utilities
-Version: 0.3.3
+Version: 0.4
 Author: Dr. John I. Robinson, PhD
 Maintainer: John Robinson <john.robinson@wustl.edu>
 Description: Various functions I (re)use frequently for statistical analyses. 
   Also has a few utilities for dealing with mass spec data in various formats.
+  Functions for working with Compound Discoverer results formerly located here 
+  have been moved to the separate compDiscTools package.
 Imports:
     base64enc,
     BiocParallel,
