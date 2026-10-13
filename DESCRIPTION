@@ -9,30 +9,22 @@ Description: Various functions I (re)use frequently for statistical analyses.
   Functions for working with Compound Discoverer results formerly located here 
   have been moved to the separate compDiscTools package.
 Imports:
-    base64enc,
-    BiocParallel,
     caret,
-    DBI,
     dplyr,
     foreach,
     ggplot2,
     glmnet,
     igraph,
-    methods,
     MSnbase,
     purrr,
     Rcpp (>= 1.0.0),
     readr,
     readxl,
     rlang,
-    RSQLite,
     stats,
     stringr,
     tibble,
-    tidyr,
-    xcms,
-    xml2,
-    zip
+    tidyr
 Suggests:
     pROC,
     ggthemes,
