@@ -7,14 +7,22 @@
 #' Current implementation only searches one spectrum in 'open'/similarity mode.
 #'
 #' @param fragment_library matrix of library spectra sorted by fragment m/z. Must
-#'   have columns "Spectrum", "mz", and "intensity"
+#'   have columns "Spectrum", "mz", and "intensity". Individual spectra MUST have
+#'   their total fragment intensity normalized to 0.5.
 #' @param query_spectrum matrix with query spectrum. Must have columns "mz" and
-#'   "intensity"
+#'   "intensity". Total intensity MUST be normalized to 0.5.
 #' @param ms2_tol_ppm Fragment matching tolerance in PPM
 #'
 #' @return A tibble containing spectral entropy similarity scores between the
 #'   query spectrum and any library spectra with matching peaks.
 #'
+#' @references
+#' Li, Y., Kind, T., Folz, J. et al. Spectral entropy outperforms MS/MS dot product
+#' similarity for small-molecule compound identification. Nat Methods 18,
+#' 1524–1531 (2021). https://doi.org/10.1038/s41592-021-01331-z
+#'
+#' Li, Y., Fiehn, O. Flash entropy search to query all mass spectral libraries in
+#' real time. Nat Methods 20, 1475–1478 (2023). https://doi.org/10.1038/s41592-023-02012-9
 #' @export
 flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm = 5.0) {
   ms2_tol_low <- 1.0 - ms2_tol_ppm/1e6
