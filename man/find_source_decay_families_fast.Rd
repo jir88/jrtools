@@ -51,7 +51,7 @@ charged versions of a single compound. It also corrects for occasional
 alignment software errors.
 }
 \details{
-This is a heavily simplified version of \link{find_source_decay_families} that
+This is a heavily simplified version of [compDiscTools::find_source_decay_families()] that
 only considers retention time and peak area correlation. It is thus much faster,
 but also potentially prone to make mistakes. Be sure to check the outputs to
 ensure that SDF calls seem reasonable for the desired downstream application.
