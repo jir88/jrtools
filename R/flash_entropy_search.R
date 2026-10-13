@@ -25,6 +25,13 @@
 #' real time. Nat Methods 20, 1475–1478 (2023). https://doi.org/10.1038/s41592-023-02012-9
 #' @export
 flash_entropy_search <- function(fragment_library, query_spectrum, ms2_tol_ppm = 5.0) {
+  # make sure query spectrum has been normalized
+  query_intensity <- query_spectrum[, "intensity"]
+  query_sum <- sum(query_intensity)
+  if(query_sum != 0.5) {
+    query_spectrum[, "intensity"] <- 0.5*query_intensity/query_sum
+  }
+
   ms2_tol_low <- 1.0 - ms2_tol_ppm/1e6
   ms2_tol_high <- 1.0 + ms2_tol_ppm/1e6
 
